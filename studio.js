@@ -14,8 +14,8 @@
   const { createClient } = window.supabase;
 
   const supabaseClient = createClient(
-    window.MODULIX_SUPABASE_URL,
-    window.MODULIX_SUPABASE_PUBLISHABLE_KEY
+  MODULIX_SUPABASE_URL,
+  MODULIX_SUPABASE_PUBLISHABLE_KEY
   );
 
 
