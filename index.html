@@ -3,94 +3,146 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Presença digital profissional para empresas.">
-  <title>Modulix Presença Digital</title>
+  <meta name="description" content="Modulix Presença Digital: páginas profissionais para apresentar empresas, serviços e produtos e facilitar o contato com clientes.">
+  <meta name="theme-color" content="#090909">
+  <title>Modulix Presença Digital | Sua empresa online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#inicio" aria-label="Página inicial">
-      <span class="brand-mark">M</span>
-      <span>MODULIX</span>
+    <a class="brand" href="#inicio" aria-label="Modulix Presença Digital - início">
+      <span class="brand-mark">M</span><span class="brand-name">MODULIX</span>
     </a>
-    <a class="top-cta" href="#contato">Fale conosco</a>
+    <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="main-nav">
+      <span></span><span></span><span></span>
+    </button>
+    <nav class="nav" id="main-nav" aria-label="Navegação principal">
+      <a href="#solucao">Solução</a><a href="#recursos">Recursos</a><a href="#processo">Como funciona</a><a href="#faq">FAQ</a>
+      <a class="nav-cta" href="#contato">Falar com a Modulix</a>
+    </nav>
   </header>
 
   <main>
     <section class="hero" id="inicio">
-      <div class="hero-content">
-        <span class="eyebrow">PRESENÇA DIGITAL PROFISSIONAL</span>
-        <h1>Sua empresa merece ser encontrada, entendida e lembrada.</h1>
-        <p>Uma página profissional, rápida e adaptada ao celular para apresentar seu negócio e transformar visitantes em contatos.</p>
+      <div class="hero-glow hero-glow-one"></div><div class="hero-glow hero-glow-two"></div>
+      <div class="hero-content reveal">
+        <div class="eyebrow"><span></span> PRESENÇA DIGITAL PROFISSIONAL</div>
+        <h1>Sua empresa online. <em>Profissional.</em> Encontrada. Lembrada.</h1>
+        <p class="hero-lead">Uma presença digital criada para apresentar sua empresa com clareza, transmitir confiança e transformar visitas em oportunidades de contato.</p>
         <div class="hero-actions">
-          <a class="button primary" href="#contato">Quero conhecer</a>
-          <a class="button secondary" href="#servicos">Ver informações</a>
+          <a class="button primary" href="#contato">Quero minha presença digital <span>→</span></a>
+          <a class="button ghost" href="#solucao">Conhecer a solução</a>
+        </div>
+        <div class="hero-proof">
+          <div><strong>01</strong><span>Uma página<br>para sua empresa</span></div>
+          <div><strong>02</strong><span>Experiência<br>adaptada ao celular</span></div>
+          <div><strong>03</strong><span>Contato rápido<br>com seu cliente</span></div>
         </div>
       </div>
-      <div class="hero-card">
-        <span class="card-label">SEU NEGÓCIO ONLINE</span>
-        <div class="mockup">
-          <div class="mockup-top"><span></span><span></span><span></span></div>
-          <div class="mockup-logo">SUA MARCA</div>
-          <div class="mockup-line large"></div>
-          <div class="mockup-line"></div>
-          <div class="mockup-button"></div>
-          <div class="mockup-grid"><i></i><i></i><i></i></div>
+      <div class="hero-visual reveal delay-1">
+        <div class="browser-window">
+          <div class="browser-bar"><div class="browser-dots"><i></i><i></i><i></i></div><span>seunegocio.modulix.app</span><b>⋯</b></div>
+          <div class="site-preview">
+            <div class="preview-nav"><span class="preview-logo">SUA MARCA</span><span class="preview-pill">CONTATO</span></div>
+            <div class="preview-copy"><small>SUA EMPRESA</small><h3>Uma presença digital que representa seu negócio.</h3><p>Serviços, informações e contato em um único lugar.</p><div class="preview-button"></div></div>
+            <div class="preview-cards"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+        <div class="floating-card floating-card-top"><span class="status-dot"></span> Online para seus clientes</div>
+        <div class="floating-card floating-card-bottom"><strong>24/7</strong><span>Sua presença<br>disponível online</span></div>
+      </div>
+    </section>
+
+    <section class="trust-strip"><p>UMA SOLUÇÃO PARA QUEM QUER</p><div><span>✓ Ser encontrado</span><span>✓ Mostrar seu trabalho</span><span>✓ Facilitar o contato</span><span>✓ Passar confiança</span></div></section>
+
+    <section class="section" id="solucao">
+      <div class="section-intro reveal">
+        <div><div class="eyebrow dark-text"><span></span> A SOLUÇÃO</div><h2>Seu negócio merece mais do que um endereço na internet.</h2></div>
+        <p>A Presença Digital Modulix reúne as informações que seu cliente precisa para conhecer sua empresa e tomar a próxima decisão — sem complicação.</p>
+      </div>
+      <div class="benefit-grid">
+        <article class="benefit-card reveal"><div class="number">01</div><div class="icon">◈</div><h3>Apresente sua empresa</h3><p>Conte quem você é, o que faz, sua história e seus diferenciais de forma profissional.</p></article>
+        <article class="benefit-card reveal delay-1"><div class="number">02</div><div class="icon">✦</div><h3>Mostre seus serviços</h3><p>Organize produtos, serviços, categorias, descrições, preços e chamadas para ação.</p></article>
+        <article class="benefit-card reveal delay-2"><div class="number">03</div><div class="icon">↗</div><h3>Converta visitas em contatos</h3><p>Deixe WhatsApp, telefone e outros canais acessíveis para o cliente falar com você.</p></article>
+        <article class="benefit-card reveal"><div class="number">04</div><div class="icon">⌁</div><h3>Funcione em qualquer tela</h3><p>Uma experiência responsiva pensada para celular, tablet e computador.</p></article>
+      </div>
+    </section>
+
+    <section class="section dark-section" id="recursos">
+      <div class="section-heading centered reveal"><div class="eyebrow"><span></span> O QUE PODE ENTRAR</div><h2>Uma página completa para o seu negócio.</h2><p>O conteúdo é personalizado conforme a realidade de cada empresa. Nada de copiar e colar um modelo sem identidade.</p></div>
+      <div class="resource-grid">
+        <div class="resource-item reveal"><span>01</span><div><h3>Apresentação</h3><p>Nome, slogan, descrição, história e posicionamento.</p></div></div>
+        <div class="resource-item reveal delay-1"><span>02</span><div><h3>Produtos e serviços</h3><p>Catálogo, categorias, descrições e chamadas para ação.</p></div></div>
+        <div class="resource-item reveal delay-2"><span>03</span><div><h3>Galeria</h3><p>Fotos da empresa, produtos, espaço e trabalhos realizados.</p></div></div>
+        <div class="resource-item reveal"><span>04</span><div><h3>Contato</h3><p>WhatsApp, telefone, e-mail e outros canais disponíveis.</p></div></div>
+        <div class="resource-item reveal delay-1"><span>05</span><div><h3>Localização</h3><p>Endereço e acesso rápido à localização do negócio.</p></div></div>
+        <div class="resource-item reveal delay-2"><span>06</span><div><h3>Horários</h3><p>Funcionamento, atendimento e informações importantes.</p></div></div>
+        <div class="resource-item reveal"><span>07</span><div><h3>Redes sociais</h3><p>Links para os canais digitais oficiais da empresa.</p></div></div>
+        <div class="resource-item reveal delay-1"><span>08</span><div><h3>FAQ</h3><p>Respostas para as dúvidas mais comuns dos clientes.</p></div></div>
+      </div>
+    </section>
+
+    <section class="section showcase-section">
+      <div class="showcase-grid">
+        <div class="showcase-copy reveal"><div class="eyebrow dark-text"><span></span> PENSADA PARA NEGÓCIOS REAIS</div><h2>Clareza para quem visita. <em>Resultado para quem vende.</em></h2><p>Seu cliente não precisa procurar informações em vários lugares. A proposta é centralizar o essencial e criar um caminho simples até o contato.</p>
+          <ul class="check-list"><li><span>✓</span> Identidade visual alinhada à sua marca</li><li><span>✓</span> Conteúdo organizado e fácil de entender</li><li><span>✓</span> Botões de contato em pontos estratégicos</li><li><span>✓</span> Estrutura pronta para futuras evoluções</li></ul>
+        </div>
+        <div class="phone-stack reveal delay-1"><div class="phone-back"></div><div class="phone"><div class="phone-notch"></div><div class="phone-screen"><div class="phone-mini-header"><span>SUA MARCA</span><i>☰</i></div><div class="phone-avatar"></div><small>SUA EMPRESA</small><h3>Qualidade que você pode conhecer.</h3><p>Conheça nossos serviços e fale conosco.</p><div class="phone-action">FALAR NO WHATSAPP</div><div class="phone-blocks"><i></i><i></i></div></div></div></div>
+      </div>
+    </section>
+
+    <section class="section process-section" id="processo">
+      <div class="section-heading reveal"><div class="eyebrow dark-text"><span></span> COMO FUNCIONA</div><h2>Do primeiro contato à publicação.</h2><p>Um processo simples para você não precisar entender de código para ter uma presença digital profissional.</p></div>
+      <div class="process-grid">
+        <article class="process-step reveal"><span>01</span><h3>Diagnóstico</h3><p>Entendemos sua empresa, público, serviços e objetivo.</p></article>
+        <article class="process-step reveal delay-1"><span>02</span><h3>Construção</h3><p>Organizamos conteúdo, identidade e experiência da página.</p></article>
+        <article class="process-step reveal delay-2"><span>03</span><h3>Aprovação</h3><p>Você revisa as informações antes da publicação.</p></article>
+        <article class="process-step reveal"><span>04</span><h3>Publicação</h3><p>Colocamos sua presença digital online e pronta para compartilhar.</p></article>
+      </div>
+    </section>
+
+    <section class="audience-section">
+      <div class="section-heading centered reveal"><div class="eyebrow"><span></span> PARA QUEM É</div><h2>Do pequeno negócio ao profissional independente.</h2><p>A solução pode ser adaptada a diferentes segmentos e objetivos.</p></div>
+      <div class="audience-list reveal"><span>Restaurantes</span><span>Barbearias</span><span>Salões</span><span>Lojas</span><span>Clínicas</span><span>Profissionais</span><span>Prestadores de serviço</span><span>Pequenas empresas</span></div>
+    </section>
+
+    <section class="section expansion-section">
+      <div class="section-intro reveal"><div><div class="eyebrow dark-text"><span></span> PODE CRESCER COM VOCÊ</div><h2>Comece com presença. Evolua com tecnologia.</h2></div><p>A Presença Digital é uma porta de entrada para outras soluções Modulix. Conforme sua empresa cresce, sua estrutura digital também pode evoluir.</p></div>
+      <div class="growth-path reveal"><div class="growth-card active"><small>01</small><strong>Presença Digital</strong><span>Seu negócio online</span></div><b>→</b><div class="growth-card"><small>02</small><strong>Catálogo &amp; Cardápio</strong><span>Produtos organizados</span></div><b>→</b><div class="growth-card"><small>03</small><strong>Automação</strong><span>Mais eficiência</span></div><b>→</b><div class="growth-card"><small>04</small><strong>Intelligence</strong><span>Dados para decidir</span></div></div>
+    </section>
+
+    <section class="section faq-section" id="faq">
+      <div class="faq-layout">
+        <div class="section-heading reveal"><div class="eyebrow dark-text"><span></span> DÚVIDAS FREQUENTES</div><h2>Antes de começar.</h2><p>Algumas respostas para as perguntas mais comuns sobre a Presença Digital.</p></div>
+        <div class="faq-list reveal delay-1">
+          <details><summary>Preciso ter conhecimento técnico?<span>+</span></summary><p>Não. A ideia é cuidar da parte técnica enquanto você fornece as informações do seu negócio e aprova o conteúdo.</p></details>
+          <details><summary>Funciona no celular?<span>+</span></summary><p>Sim. A estrutura é responsiva e foi pensada para celulares, tablets e computadores.</p></details>
+          <details><summary>Posso colocar WhatsApp e redes sociais?<span>+</span></summary><p>Sim. Os canais oficiais disponíveis da sua empresa podem ser incorporados à página.</p></details>
+          <details><summary>Posso colocar fotos e produtos?<span>+</span></summary><p>Sim. A página pode apresentar imagens, serviços, produtos, categorias e descrições.</p></details>
+          <details><summary>Posso ter domínio próprio?<span>+</span></summary><p>Sim. O projeto pode evoluir para um domínio próprio, conforme a configuração escolhida.</p></details>
+          <details><summary>Isso pode virar algo maior no futuro?<span>+</span></summary><p>Sim. A Presença Digital é planejada como uma porta de entrada para outras soluções digitais da Modulix.</p></details>
         </div>
       </div>
     </section>
 
-    <section class="section" id="sobre">
-      <div class="section-heading">
-        <span class="eyebrow">SOBRE</span>
-        <h2>Uma presença digital clara e profissional.</h2>
-        <p>Centralize as informações mais importantes do seu negócio em um único endereço.</p>
-      </div>
-      <div class="feature-grid">
-        <article class="feature"><span>01</span><h3>Apresentação</h3><p>Explique quem você é, o que oferece e por que o cliente deve escolher sua empresa.</p></article>
-        <article class="feature"><span>02</span><h3>Contato rápido</h3><p>Facilite o contato com WhatsApp, telefone, redes sociais e outros canais.</p></article>
-        <article class="feature"><span>03</span><h3>Mobile first</h3><p>Experiência pensada para o celular, onde grande parte dos seus clientes estará.</p></article>
-        <article class="feature"><span>04</span><h3>Publicação online</h3><p>Seu endereço fica disponível na internet para você compartilhar com seus clientes.</p></article>
-      </div>
-    </section>
-
-    <section class="section dark" id="servicos">
-      <div class="section-heading">
-        <span class="eyebrow">O QUE PODE ENTRAR</span>
-        <h2>As informações certas, no lugar certo.</h2>
-      </div>
-      <div class="service-grid">
-        <div>✓ Serviços ou produtos</div>
-        <div>✓ Horário de funcionamento</div>
-        <div>✓ Endereço e localização</div>
-        <div>✓ WhatsApp</div>
-        <div>✓ Instagram e redes sociais</div>
-        <div>✓ Fotos e galeria</div>
-        <div>✓ Links importantes</div>
-        <div>✓ Botões de ação</div>
-      </div>
-    </section>
-
-    <section class="section" id="contato">
-      <div class="contact-card">
-        <div>
-          <span class="eyebrow">ATENDIMENTO</span>
-          <h2>Vamos colocar sua empresa na internet?</h2>
-          <p>Fale com a Modulix e conte o que sua empresa precisa. A solução pode ser personalizada para o seu negócio.</p>
-        </div>
-        <div class="contact-actions">
-          <a class="button primary" href="https://wa.me/5535991995490?text=Olá%20Modulix!%20Quero%20saber%20mais%20sobre%20a%20Presença%20Digital." target="_blank" rel="noopener">WhatsApp</a>
-          <a class="button secondary" href="mailto:contato@modulix.com.br">E-mail</a>
-        </div>
+    <section class="cta-section" id="contato">
+      <div class="cta-glow"></div><div class="cta-content reveal">
+        <div class="eyebrow"><span></span> VAMOS COMEÇAR</div>
+        <h2>Pronto para colocar sua empresa no próximo nível?</h2>
+        <p>Conte para a Modulix o que sua empresa faz e o que você precisa. A partir daí, construímos a melhor presença digital para o seu negócio.</p>
+        <a class="button primary large-button" href="https://wa.me/5535991995490?text=Olá%20Modulix!%20Quero%20conhecer%20a%20Presença%20Digital." target="_blank" rel="noopener noreferrer">Falar com a Modulix pelo WhatsApp <span>→</span></a>
+        <small>Atendimento inicial pelo WhatsApp · Solução personalizada conforme a necessidade</small>
       </div>
     </section>
   </main>
 
   <footer>
-    <div class="brand"><span class="brand-mark">M</span><span>MODULIX</span></div>
-    <p>Modulix tecnologia · Presença Digital · Tecnologia para empresas.</p>
+    <div class="footer-main"><a class="brand" href="#inicio" aria-label="Voltar ao início"><span class="brand-mark">M</span><span class="brand-name">MODULIX</span></a><p>Tecnologia que ajuda empresas a crescer, organizar e decidir melhor.</p><a class="footer-link" href="#contato">Falar com a Modulix →</a></div>
+    <div class="footer-bottom"><span>© <span id="current-year">2026</span> Modulix Tecnologia</span><span>Presença Digital · V2</span></div>
   </footer>
-
   <script src="script.js"></script>
 </body>
 </html>

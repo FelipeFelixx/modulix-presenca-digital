@@ -1,41 +1,59 @@
-# Modulix Presença Digital — V1
+# Modulix Presença Digital — V2
 
-Template comercial inicial da Modulix para pequenos negócios.
+Versão comercial evoluída da Presença Digital da Modulix Tecnologia.
 
-## Publicação sem VS Code
+## Objetivo
 
-Esta versão é um site estático e não precisa de Node.js, React ou servidor local.
+Criar uma presença digital profissional para pequenos negócios, profissionais e empresas que precisam apresentar sua marca, serviços/produtos e canais de contato em um único endereço.
 
-Pode ser publicada em uma hospedagem estática, como Vercel, a partir desta pasta/ZIP.
+## Implementado — V2
 
-## Antes de entregar a um cliente
+- Hero comercial com proposta de valor e CTAs
+- Navegação responsiva com menu mobile
+- Seção de benefícios
+- Catálogo de recursos possíveis
+- Apresentação visual mobile/desktop
+- Processo em quatro etapas
+- Segmentos atendidos
+- Trilha de evolução para outros produtos Modulix
+- FAQ interativo
+- CTA comercial para WhatsApp
+- Layout responsivo
+- Animações de entrada leves
+- Estrutura estática pronta para Vercel
+- SEO básico
+- Ano do rodapé atualizado automaticamente
 
-Substituir:
-- nome da empresa;
+## Não inventar como implementado
+
+Ainda não fazem parte desta V2:
+- painel/CMS para o cliente editar conteúdo;
+- geração automática de páginas;
+- banco de dados;
+- autenticação;
+- analytics conectado;
+- domínio próprio automático;
+- cobrança/assinatura;
+- integração operacional com Modulix Platform.
+
+Esses itens permanecem planejados para fases futuras.
+
+## Personalização antes de cliente real
+
+Trocar pelo conteúdo real:
+- nome e identidade visual;
 - textos;
 - serviços/produtos;
+- fotos;
 - WhatsApp;
-- e-mail;
 - endereço;
+- horários;
 - redes sociais;
-- imagens;
-- título e descrição SEO.
+- domínio;
+- metadados SEO.
 
-## Status
+## Publicação
 
-🟢 IMPLEMENTADO
-- Landing page responsiva
-- Seções de apresentação
-- Serviços
-- Contato
-- CTA para WhatsApp/e-mail
-- Layout mobile
-- Estrutura preparada para publicação
+Projeto estático: `index.html`, `styles.css` e `script.js`.
 
-🔵 PLANEJADO
-- formulário conectado
-- domínio próprio
-- analytics
-- CMS/painel para edição
-- geração de páginas por cliente
-- integração com a plataforma Modulix
+Pode ser publicado em hospedagem estática, incluindo Vercel.
