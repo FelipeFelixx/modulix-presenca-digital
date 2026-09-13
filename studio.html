@@ -966,4 +966,432 @@
               class="back-btn"
               data-view="projects"
             >
-              ← Voltar para pro
+              ← Voltar para projetos
+            </button>
+
+            <span class="eyebrow">
+              CONSTRUTOR
+            </span>
+
+            <h1 id="formTitle">
+              Novo projeto
+            </h1>
+
+            <p>
+              Configure o modelo e o conteúdo da presença digital.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="editor-grid">
+
+          <!-- EDITOR -->
+
+          <article class="panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  CONFIGURAÇÃO
+                </span>
+
+                <h3>
+                  Conteúdo
+                </h3>
+              </div>
+
+            </div>
+
+
+            <form id="projectForm">
+
+              <input
+                id="projectId"
+                type="hidden"
+              >
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>01</span>
+                  Projeto
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectName">
+                    Nome do projeto *
+                  </label>
+
+                  <input
+                    id="projectName"
+                    type="text"
+                    placeholder="Ex.: Presença Digital — Café Aurora"
+                    required
+                  >
+
+                </div>
+
+
+                <div class="form-row">
+
+                  <div class="field">
+
+                    <label for="projectClient">
+                      Cliente *
+                    </label>
+
+                    <select
+                      id="projectClient"
+                      required
+                    >
+                      <option value="">
+                        Selecione um cliente
+                      </option>
+                    </select>
+
+                  </div>
+
+
+                  <div class="field">
+
+                    <label for="projectTemplate">
+                      Modelo *
+                    </label>
+
+                    <select
+                      id="projectTemplate"
+                      required
+                    >
+                      <option value="">
+                        Selecione um modelo
+                      </option>
+                    </select>
+
+                  </div>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectSlug">
+                    Slug
+                  </label>
+
+                  <input
+                    id="projectSlug"
+                    type="text"
+                    placeholder="cafe-aurora"
+                  >
+
+                  <small class="field-help">
+                    Identificador utilizado futuramente para publicação.
+                  </small>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectStatus">
+                    Status
+                  </label>
+
+                  <select id="projectStatus">
+
+                    <option value="draft">
+                      Rascunho
+                    </option>
+
+                    <option value="review">
+                      Em revisão
+                    </option>
+
+                    <option value="approved">
+                      Aprovado
+                    </option>
+
+                    <option value="published">
+                      Publicado
+                    </option>
+
+                    <option value="archived">
+                      Arquivado
+                    </option>
+
+                  </select>
+
+                </div>
+
+              </div>
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>02</span>
+                  Conteúdo da presença
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectHeadline">
+                    Título principal
+                  </label>
+
+                  <input
+                    id="projectHeadline"
+                    type="text"
+                    placeholder="Uma experiência feita para você."
+                  >
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectDescription">
+                    Descrição
+                  </label>
+
+                  <textarea
+                    id="projectDescription"
+                    rows="4"
+                    placeholder="Descreva o negócio, seus diferenciais e sua proposta."
+                  ></textarea>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectCta">
+                    Texto do botão
+                  </label>
+
+                  <input
+                    id="projectCta"
+                    type="text"
+                    placeholder="Falar pelo WhatsApp"
+                  >
+
+                </div>
+
+              </div>
+
+
+              <div class="form-actions">
+
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  data-view="projects"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  id="previewBtn"
+                  class="btn btn-secondary"
+                >
+                  Visualizar
+                </button>
+
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                >
+                  Salvar projeto
+                </button>
+
+              </div>
+
+              <p
+                id="projectMessage"
+                class="form-message"
+              ></p>
+
+            </form>
+
+          </article>
+
+
+          <!-- TEMPLATE CHOICES -->
+
+          <aside class="editor-sidebar">
+
+            <article class="panel">
+
+              <div class="panel-header">
+
+                <div>
+                  <span class="panel-kicker">
+                    MODELOS
+                  </span>
+
+                  <h3>
+                    Escolha o visual
+                  </h3>
+                </div>
+
+              </div>
+
+
+              <div
+                id="templateChoices"
+                class="template-choices"
+              >
+
+                <div class="empty-state small">
+                  <span>◈</span>
+                  <strong>Carregando...</strong>
+                </div>
+
+              </div>
+
+            </article>
+
+
+            <article class="editor-tip">
+
+              <span class="tip-icon">
+                ✦
+              </span>
+
+              <div>
+
+                <strong>
+                  Dica
+                </strong>
+
+                <p>
+                  O conteúdo poderá ser ajustado posteriormente antes
+                  da publicação.
+                </p>
+
+              </div>
+
+            </article>
+
+          </aside>
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================================
+           PREVIEW
+      ====================================================== -->
+
+      <section
+        id="view-preview"
+        class="view preview-view"
+      >
+
+        <div class="preview-toolbar">
+
+          <div>
+
+            <button
+              type="button"
+              class="back-btn"
+              data-action="close-preview"
+            >
+              ← Voltar
+            </button>
+
+            <div class="preview-title">
+
+              <span class="eyebrow">
+                PREVIEW
+              </span>
+
+              <h1 id="previewProjectTitle">
+                Pré-visualização
+              </h1>
+
+            </div>
+
+          </div>
+
+
+          <div class="preview-actions">
+
+            <button
+              type="button"
+              id="downloadBtn"
+              class="btn btn-primary"
+            >
+              ↓ Gerar HTML
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <div class="browser-frame">
+
+          <div class="browser-bar">
+
+            <div class="browser-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+
+            <div class="browser-address">
+              modulix.digital / preview
+            </div>
+
+          </div>
+
+
+          <iframe
+            id="frame"
+            title="Pré-visualização da presença digital"
+            sandbox=""
+          ></iframe>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </section>
+
+
+  <!-- =========================================================
+       TOAST / NOTIFICAÇÕES
+  ========================================================== -->
+
+  <div
+    id="toast"
+    class="toast"
+    role="status"
+    aria-live="polite"
+  >
+    <span id="toastIcon">✓</span>
+    <span id="toastMessage">Operação realizada.</span>
+  </div>
+
+
+  <!-- =========================================================
+       JAVASCRIPT DO STUDIO
+  ========================================================== -->
+
+  <script src="studio.js"></script>
+
+</body>
+</html>
