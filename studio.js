@@ -8,15 +8,79 @@
   "use strict";
 
   /* =======================================================
+     CONFIGURAÇÃO / SEGURANÇA DE EXECUÇÃO
+  ======================================================== */
+
+  const AUTH_TIMEOUT_MS = 15000;
+
+  /*
+    Impede que o navegador execute o comportamento nativo
+    GET do formulário de login caso algum outro trecho da
+    inicialização demore ou falhe.
+
+    IMPORTANTE:
+    Não usamos stopPropagation().
+    O listener normal do login continua podendo executar.
+  */
+  document.addEventListener(
+    "submit",
+    (event) => {
+      const form = event.target;
+
+      if (
+        form &&
+        form.id === "loginForm"
+      ) {
+        event.preventDefault();
+      }
+    },
+    true
+  );
+
+
+  /* =======================================================
      SUPABASE
   ======================================================== */
 
-  const { createClient } = window.supabase;
+  let supabaseClient = null;
 
-  const supabaseClient = createClient(
-  MODULIX_SUPABASE_URL,
-  MODULIX_SUPABASE_PUBLISHABLE_KEY
-  );
+  function initializeSupabase() {
+    try {
+      if (
+        !window.supabase ||
+        typeof window.supabase.createClient !== "function"
+      ) {
+        throw new Error(
+          "A biblioteca do Supabase não foi carregada."
+        );
+      }
+
+      if (
+        typeof MODULIX_SUPABASE_URL === "undefined" ||
+        typeof MODULIX_SUPABASE_PUBLISHABLE_KEY === "undefined"
+      ) {
+        throw new Error(
+          "A configuração pública do Supabase não foi carregada."
+        );
+      }
+
+      supabaseClient =
+        window.supabase.createClient(
+          MODULIX_SUPABASE_URL,
+          MODULIX_SUPABASE_PUBLISHABLE_KEY
+        );
+
+      return true;
+
+    } catch (error) {
+      console.error(
+        "Erro ao inicializar Supabase:",
+        error
+      );
+
+      return false;
+    }
+  }
 
 
   /* =======================================================
@@ -29,7 +93,9 @@
     projects: [],
     templates: [],
     currentProject: null,
-    currentPreview: null
+    currentPreview: null,
+    initialized: false,
+    enteringApp: false
   };
 
 
@@ -37,11 +103,14 @@
      HELPERS DOM
   ======================================================== */
 
-  const $ = (selector) => document.querySelector(selector);
+  const $ = (selector) =>
+    document.querySelector(selector);
 
-  const $$ = (selector) => {
-    return Array.from(document.querySelectorAll(selector));
-  };
+
+  const $$ = (selector) =>
+    Array.from(
+      document.querySelectorAll(selector)
+    );
 
 
   /* =======================================================
@@ -75,7 +144,8 @@
 
 
   function firstLetter(value) {
-    const text = normalizeText(value);
+    const text =
+      normalizeText(value);
 
     return text
       ? text.charAt(0).toUpperCase()
@@ -86,17 +156,25 @@
   function formatDate(value) {
     if (!value) return "—";
 
-    const date = new Date(value);
+    const date =
+      new Date(value);
 
-    if (Number.isNaN(date.getTime())) {
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
       return "—";
     }
 
-    return new Intl.DateTimeFormat("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    }).format(date);
+    return new Intl.DateTimeFormat(
+      "pt-BR",
+      {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }
+    ).format(date);
   }
 
 
@@ -109,16 +187,26 @@
       archived: "Arquivado"
     };
 
-    return labels[status] || status || "Rascunho";
+    return (
+      labels[status] ||
+      status ||
+      "Rascunho"
+    );
   }
 
 
-  function showMessage(element, message, type = "") {
+  function showMessage(
+    element,
+    message,
+    type = ""
+  ) {
     if (!element) return;
 
-    element.textContent = message || "";
+    element.textContent =
+      message || "";
 
-    element.className = "form-message";
+    element.className =
+      "form-message";
 
     if (type) {
       element.classList.add(type);
@@ -126,30 +214,60 @@
   }
 
 
-  function showToast(message, type = "success") {
-    const toast = $("#toast");
-    const toastMessage = $("#toastMessage");
-    const toastIcon = $("#toastIcon");
+  function showToast(
+    message,
+    type = "success"
+  ) {
+    const toast =
+      $("#toast");
 
-    if (!toast || !toastMessage) return;
+    const toastMessage =
+      $("#toastMessage");
 
-    toastMessage.textContent = message;
+    const toastIcon =
+      $("#toastIcon");
 
-    if (toastIcon) {
-      toastIcon.textContent = type === "error" ? "!" : "✓";
+    if (
+      !toast ||
+      !toastMessage
+    ) {
+      return;
     }
 
-    toast.classList.add("show");
+    toastMessage.textContent =
+      message;
 
-    window.clearTimeout(showToast.timer);
+    if (toastIcon) {
+      toastIcon.textContent =
+        type === "error"
+          ? "!"
+          : "✓";
+    }
 
-    showToast.timer = window.setTimeout(() => {
-      toast.classList.remove("show");
-    }, 3000);
+    toast.classList.add(
+      "show"
+    );
+
+    window.clearTimeout(
+      showToast.timer
+    );
+
+    showToast.timer =
+      window.setTimeout(
+        () => {
+          toast.classList.remove(
+            "show"
+          );
+        },
+        3000
+      );
   }
 
 
-  function setLoading(container, message = "Carregando") {
+  function setLoading(
+    container,
+    message = "Carregando"
+  ) {
     if (!container) return;
 
     container.innerHTML = `
@@ -157,6 +275,49 @@
         ${escapeHtml(message)}
       </div>
     `;
+  }
+
+
+  /* =======================================================
+     TIMEOUT
+  ======================================================== */
+
+  async function withTimeout(
+    promise,
+    message = "O servidor demorou para responder."
+  ) {
+    let timer = null;
+
+    const timeoutPromise =
+      new Promise(
+        (_, reject) => {
+          timer =
+            window.setTimeout(
+              () => {
+                reject(
+                  new Error(
+                    message
+                  )
+                );
+              },
+              AUTH_TIMEOUT_MS
+            );
+        }
+      );
+
+    try {
+      return await Promise.race([
+        promise,
+        timeoutPromise
+      ]);
+
+    } finally {
+      if (timer) {
+        window.clearTimeout(
+          timer
+        );
+      }
+    }
   }
 
 
@@ -175,29 +336,43 @@
 
 
   function show(viewName) {
-    const views = $$(".view");
+    const views =
+      $$(".view");
 
-    views.forEach((view) => {
-      view.classList.remove("active-view");
-    });
+    views.forEach(
+      (view) => {
+        view.classList.remove(
+          "active-view"
+        );
+      }
+    );
 
-    const target = $(`#view-${viewName}`);
+    const target =
+      $(`#view-${viewName}`);
 
     if (target) {
-      target.classList.add("active-view");
+      target.classList.add(
+        "active-view"
+      );
     }
 
-    $$(".nav-item").forEach((item) => {
-      item.classList.toggle(
-        "active",
-        item.dataset.view === viewName
-      );
-    });
+    $$(".nav-item").forEach(
+      (item) => {
+        item.classList.toggle(
+          "active",
+          item.dataset.view ===
+            viewName
+        );
+      }
+    );
 
-    const title = $("#pageTitle");
+    const title =
+      $("#pageTitle");
 
     if (title) {
-      title.textContent = viewTitles[viewName] || "Studio";
+      title.textContent =
+        viewTitles[viewName] ||
+        "Studio";
     }
 
     window.scrollTo({
@@ -210,12 +385,16 @@
 
 
   function openMobileMenu() {
-    $(".sidebar")?.classList.add("mobile-open");
+    $(".sidebar")?.classList.add(
+      "mobile-open"
+    );
   }
 
 
   function closeMobileMenu() {
-    $(".sidebar")?.classList.remove("mobile-open");
+    $(".sidebar")?.classList.remove(
+      "mobile-open"
+    );
   }
 
 
@@ -224,124 +403,286 @@
   ======================================================== */
 
   async function getSession() {
-    const {
-      data,
-      error
-    } = await supabaseClient.auth.getSession();
-
-    if (error) {
-      console.error(error);
+    if (!supabaseClient) {
       return null;
     }
 
-    return data.session;
+    try {
+      const result =
+        await withTimeout(
+          supabaseClient.auth.getSession(),
+          "O Supabase não respondeu ao verificar a sessão."
+        );
+
+      const {
+        data,
+        error
+      } = result;
+
+      if (error) {
+        console.error(
+          "Erro ao obter sessão:",
+          error
+        );
+
+        return null;
+      }
+
+      return data?.session || null;
+
+    } catch (error) {
+      console.error(
+        "Erro ao verificar sessão:",
+        error
+      );
+
+      return null;
+    }
   }
 
 
-  async function login(email, password) {
-    const button = $("#loginSubmit");
-    const message = $("#loginMessage");
+  async function login(
+    email,
+    password
+  ) {
+    const button =
+      $("#loginSubmit");
 
-    showMessage(message, "Entrando...");
-
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Entrando...";
-    }
-
-    const {
-      data,
-      error
-    } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Entrar no Studio";
-    }
-
-    if (error) {
-      console.error(error);
-
-      showMessage(
-        message,
-        error.message || "Não foi possível entrar.",
-        "error"
-      );
-
-      return;
-    }
+    const message =
+      $("#loginMessage");
 
     showMessage(
       message,
-      "Login realizado.",
-      "success"
+      "Entrando..."
     );
 
-    state.user = data.user;
+    if (button) {
+      button.disabled = true;
+      button.textContent =
+        "Entrando...";
+    }
 
-    await enterApp();
+    try {
+      if (!supabaseClient) {
+        throw new Error(
+          "O Supabase não foi inicializado. Recarregue a página e tente novamente."
+        );
+      }
+
+      const result =
+        await withTimeout(
+          supabaseClient.auth.signInWithPassword({
+            email,
+            password
+          }),
+          "O Supabase não respondeu em 15 segundos. Verifique sua conexão e tente novamente."
+        );
+
+      const {
+        data,
+        error
+      } = result;
+
+      if (error) {
+        console.error(
+          "Erro de login:",
+          error
+        );
+
+        showMessage(
+          message,
+          error.message ||
+            "Não foi possível entrar.",
+          "error"
+        );
+
+        return;
+      }
+
+      if (!data?.user) {
+        showMessage(
+          message,
+          "O login não retornou um usuário válido.",
+          "error"
+        );
+
+        return;
+      }
+
+      state.user =
+        data.user;
+
+      showMessage(
+        message,
+        "Login realizado.",
+        "success"
+      );
+
+      await enterApp();
+
+    } catch (error) {
+      console.error(
+        "Erro inesperado no login:",
+        error
+      );
+
+      showMessage(
+        message,
+        error?.message ||
+          "Não foi possível realizar o login.",
+        "error"
+      );
+
+    } finally {
+      if (button) {
+        button.disabled =
+          false;
+
+        button.textContent =
+          "Entrar no Studio";
+      }
+    }
   }
 
 
   async function logout() {
-    const {
-      error
-    } = await supabaseClient.auth.signOut();
+    if (!supabaseClient) {
+      state.user = null;
 
-    if (error) {
-      console.error(error);
+      $("#app")?.classList.add(
+        "hidden"
+      );
 
-      showToast(
-        "Não foi possível sair.",
-        "error"
+      $("#loginScreen")?.classList.remove(
+        "hidden"
       );
 
       return;
     }
 
-    state.user = null;
+    try {
+      const result =
+        await withTimeout(
+          supabaseClient.auth.signOut(),
+          "O Supabase não respondeu ao sair."
+        );
 
-    $("#app")?.classList.add("hidden");
-    $("#loginScreen")?.classList.remove("hidden");
+      const {
+        error
+      } = result;
 
-    const loginMessage = $("#loginMessage");
+      if (error) {
+        console.error(
+          error
+        );
 
-    showMessage(
-      loginMessage,
-      "Sessão encerrada.",
-      "success"
-    );
+        showToast(
+          "Não foi possível sair.",
+          "error"
+        );
+
+        return;
+      }
+
+      state.user = null;
+      state.clients = [];
+      state.projects = [];
+      state.templates = [];
+      state.currentProject = null;
+      state.currentPreview = null;
+
+      $("#app")?.classList.add(
+        "hidden"
+      );
+
+      $("#loginScreen")?.classList.remove(
+        "hidden"
+      );
+
+      const loginMessage =
+        $("#loginMessage");
+
+      showMessage(
+        loginMessage,
+        "Sessão encerrada.",
+        "success"
+      );
+
+    } catch (error) {
+      console.error(
+        "Erro ao sair:",
+        error
+      );
+
+      showToast(
+        error?.message ||
+          "Não foi possível sair.",
+        "error"
+      );
+    }
   }
 
 
   async function enterApp() {
-    $("#loginScreen")?.classList.add("hidden");
-    $("#app")?.classList.remove("hidden");
+    if (state.enteringApp) {
+      return;
+    }
 
-    updateUserInterface();
+    state.enteringApp =
+      true;
 
-    show("dashboard");
+    try {
+      $("#loginScreen")?.classList.add(
+        "hidden"
+      );
 
-    await loadAll();
+      $("#app")?.classList.remove(
+        "hidden"
+      );
+
+      updateUserInterface();
+
+      show("dashboard");
+
+      await loadAll();
+
+    } catch (error) {
+      console.error(
+        "Erro ao entrar no Studio:",
+        error
+      );
+
+      showToast(
+        "O Studio abriu, mas houve um erro ao carregar os dados.",
+        "error"
+      );
+
+    } finally {
+      state.enteringApp =
+        false;
+    }
   }
 
 
   function updateUserInterface() {
-    const emailElement = $("#userEmail");
+    const emailElement =
+      $("#userEmail");
 
     if (emailElement) {
       emailElement.textContent =
-        state.user?.email || "Usuário";
+        state.user?.email ||
+        "Usuário";
     }
 
-    const avatar = $(".user-avatar");
+    const avatar =
+      $(".user-avatar");
 
     if (avatar) {
       avatar.textContent =
-        firstLetter(state.user?.email || "M");
+        firstLetter(
+          state.user?.email ||
+            "M"
+        );
     }
   }
 
@@ -351,54 +692,124 @@
   ======================================================== */
 
   async function loadClients() {
-    const {
-      data,
-      error
-    } = await supabaseClient
-      .from("digital_presence_clients")
-      .select("*")
-      .order("created_at", {
-        ascending: false
-      });
+    if (!supabaseClient) {
+      return [];
+    }
 
-    if (error) {
-      console.error("Erro ao carregar clientes:", error);
+    try {
+      const {
+        data,
+        error
+      } = await supabaseClient
+        .from(
+          "digital_presence_clients"
+        )
+        .select("*")
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        );
 
-      showToast(
-        "Não foi possível carregar os clientes.",
-        "error"
+      if (error) {
+        console.error(
+          "Erro ao carregar clientes:",
+          error
+        );
+
+        showToast(
+          "Não foi possível carregar os clientes.",
+          "error"
+        );
+
+        return [];
+      }
+
+      state.clients =
+        data || [];
+
+      return state.clients;
+
+    } catch (error) {
+      console.error(
+        "Erro ao carregar clientes:",
+        error
       );
 
       return [];
     }
-
-    state.clients = data || [];
-
-    return state.clients;
   }
 
 
   async function saveClient(event) {
     event.preventDefault();
 
-    const form = $("#clientForm");
+    const form =
+      $("#clientForm");
 
     if (!form) return;
 
-    const id = normalizeText(
-      $("#clientId")?.value
-    );
+    if (!state.user) {
+      showMessage(
+        $("#clientMessage"),
+        "Sua sessão expirou. Entre novamente.",
+        "error"
+      );
+
+      return;
+    }
+
+    const id =
+      normalizeText(
+        $("#clientId")?.value
+      );
 
     const payload = {
-      name: normalizeText($("#clientName")?.value),
-      category: normalizeText($("#clientCategory")?.value),
-      email: normalizeText($("#clientEmail")?.value),
-      phone: normalizeText($("#clientPhone")?.value),
-      whatsapp: normalizeText($("#clientWhatsapp")?.value),
-      instagram: normalizeText($("#clientInstagram")?.value),
-      address: normalizeText($("#clientAddress")?.value),
-      hours: normalizeText($("#clientHours")?.value),
-      notes: normalizeText($("#clientNotes")?.value)
+      name:
+        normalizeText(
+          $("#clientName")?.value
+        ),
+
+      category:
+        normalizeText(
+          $("#clientCategory")?.value
+        ),
+
+      email:
+        normalizeText(
+          $("#clientEmail")?.value
+        ),
+
+      phone:
+        normalizeText(
+          $("#clientPhone")?.value
+        ),
+
+      whatsapp:
+        normalizeText(
+          $("#clientWhatsapp")?.value
+        ),
+
+      instagram:
+        normalizeText(
+          $("#clientInstagram")?.value
+        ),
+
+      address:
+        normalizeText(
+          $("#clientAddress")?.value
+        ),
+
+      hours:
+        normalizeText(
+          $("#clientHours")?.value
+        ),
+
+      notes:
+        normalizeText(
+          $("#clientNotes")?.value
+        )
     };
 
     if (!payload.name) {
@@ -411,96 +822,153 @@
       return;
     }
 
-    const button = form.querySelector(
-      'button[type="submit"]'
-    );
+    const button =
+      form.querySelector(
+        'button[type="submit"]'
+      );
 
     if (button) {
-      button.disabled = true;
-      button.textContent = "Salvando...";
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Salvando...";
     }
 
-    let result;
+    try {
+      let result;
 
-    if (id) {
-      result = await supabaseClient
-        .from("digital_presence_clients")
-        .update(payload)
-        .eq("id", id)
-        .select()
-        .single();
-    } else {
-      result = await supabaseClient
-        .from("digital_presence_clients")
-        .insert({
-          ...payload,
-          created_by: state.user.id
-        })
-        .select()
-        .single();
-    }
+      if (id) {
+        result =
+          await supabaseClient
+            .from(
+              "digital_presence_clients"
+            )
+            .update(payload)
+            .eq("id", id)
+            .select()
+            .single();
 
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Salvar cliente";
-    }
+      } else {
+        result =
+          await supabaseClient
+            .from(
+              "digital_presence_clients"
+            )
+            .insert({
+              ...payload,
+              created_by:
+                state.user.id
+            })
+            .select()
+            .single();
+      }
 
-    if (result.error) {
-      console.error(result.error);
+      if (result.error) {
+        console.error(
+          result.error
+        );
+
+        showMessage(
+          $("#clientMessage"),
+          result.error.message ||
+            "Não foi possível salvar o cliente.",
+          "error"
+        );
+
+        return;
+      }
+
+      await loadClients();
+
+      renderClients();
+      populateClientSelect();
+      updateMetrics();
+
+      resetClientForm();
 
       showMessage(
         $("#clientMessage"),
-        result.error.message ||
+        "Cliente salvo com sucesso.",
+        "success"
+      );
+
+      showToast(
+        id
+          ? "Cliente atualizado."
+          : "Cliente cadastrado."
+      );
+
+    } catch (error) {
+      console.error(
+        "Erro ao salvar cliente:",
+        error
+      );
+
+      showMessage(
+        $("#clientMessage"),
+        error?.message ||
           "Não foi possível salvar o cliente.",
         "error"
       );
 
-      return;
+    } finally {
+      if (button) {
+        button.disabled =
+          false;
+
+        button.textContent =
+          "Salvar cliente";
+      }
     }
-
-    await loadClients();
-    renderClients();
-    populateClientSelect();
-    updateMetrics();
-
-    resetClientForm();
-
-    showMessage(
-      $("#clientMessage"),
-      "Cliente salvo com sucesso.",
-      "success"
-    );
-
-    showToast(
-      id
-        ? "Cliente atualizado."
-        : "Cliente cadastrado."
-    );
   }
 
 
   function editClient(id) {
-    const client = state.clients.find(
-      (item) => item.id === id
-    );
+    const client =
+      state.clients.find(
+        (item) =>
+          item.id === id
+      );
 
     if (!client) return;
 
-    $("#clientId").value = client.id || "";
-    $("#clientName").value = client.name || "";
-    $("#clientCategory").value = client.category || "";
-    $("#clientEmail").value = client.email || "";
-    $("#clientPhone").value = client.phone || "";
-    $("#clientWhatsapp").value = client.whatsapp || "";
-    $("#clientInstagram").value = client.instagram || "";
-    $("#clientAddress").value = client.address || "";
-    $("#clientHours").value = client.hours || "";
-    $("#clientNotes").value = client.notes || "";
+    $("#clientId").value =
+      client.id || "";
 
-    const title = $("#clientFormTitle");
+    $("#clientName").value =
+      client.name || "";
+
+    $("#clientCategory").value =
+      client.category || "";
+
+    $("#clientEmail").value =
+      client.email || "";
+
+    $("#clientPhone").value =
+      client.phone || "";
+
+    $("#clientWhatsapp").value =
+      client.whatsapp || "";
+
+    $("#clientInstagram").value =
+      client.instagram || "";
+
+    $("#clientAddress").value =
+      client.address || "";
+
+    $("#clientHours").value =
+      client.hours || "";
+
+    $("#clientNotes").value =
+      client.notes || "";
+
+    const title =
+      $("#clientFormTitle");
 
     if (title) {
-      title.textContent = "Editar cliente";
+      title.textContent =
+        "Editar cliente";
     }
 
     show("clients");
@@ -513,14 +981,16 @@
 
 
   function resetClientForm() {
-    const form = $("#clientForm");
+    const form =
+      $("#clientForm");
 
     if (form) {
       form.reset();
     }
 
     if ($("#clientId")) {
-      $("#clientId").value = "";
+      $("#clientId").value =
+        "";
     }
 
     if ($("#clientFormTitle")) {
@@ -536,47 +1006,66 @@
 
 
   async function archiveClient(id) {
-    const client = state.clients.find(
-      (item) => item.id === id
-    );
+    const client =
+      state.clients.find(
+        (item) =>
+          item.id === id
+      );
 
     if (!client) return;
 
-    const confirmed = window.confirm(
-      `Arquivar o cliente "${client.name}"?`
-    );
+    const confirmed =
+      window.confirm(
+        `Arquivar o cliente "${client.name}"?`
+      );
 
     if (!confirmed) return;
 
-    const {
-      error
-    } = await supabaseClient
-      .from("digital_presence_clients")
-      .update({
-        status: "archived"
-      })
-      .eq("id", id);
+    try {
+      const {
+        error
+      } = await supabaseClient
+        .from(
+          "digital_presence_clients"
+        )
+        .update({
+          status: "archived"
+        })
+        .eq("id", id);
 
-    if (error) {
-      console.error(error);
+      if (error) {
+        console.error(
+          error
+        );
+
+        showToast(
+          "Não foi possível arquivar o cliente.",
+          "error"
+        );
+
+        return;
+      }
+
+      await loadClients();
+
+      renderClients();
+      populateClientSelect();
+      updateMetrics();
+
+      showToast(
+        "Cliente arquivado."
+      );
+
+    } catch (error) {
+      console.error(
+        error
+      );
 
       showToast(
         "Não foi possível arquivar o cliente.",
         "error"
       );
-
-      return;
     }
-
-    await loadClients();
-
-    renderClients();
-    populateClientSelect();
-    updateMetrics();
-
-    showToast(
-      "Cliente arquivado."
-    );
   }
 
 
@@ -585,70 +1074,112 @@
   ======================================================== */
 
   async function loadProjects() {
-    const {
-      data,
-      error
-    } = await supabaseClient
-      .from("digital_presence_projects")
-      .select(`
-        *,
-        client:digital_presence_clients (
-          id,
-          name,
-          category
-        ),
-        template:digital_presence_templates (
-          id,
-          slug,
-          name,
-          version
+    if (!supabaseClient) {
+      return [];
+    }
+
+    try {
+      const {
+        data,
+        error
+      } = await supabaseClient
+        .from(
+          "digital_presence_projects"
         )
-      `)
-      .order("created_at", {
-        ascending: false
-      });
+        .select(`
+          *,
+          client:digital_presence_clients (
+            id,
+            name,
+            category
+          ),
+          template:digital_presence_templates (
+            id,
+            slug,
+            name,
+            version
+          )
+        `)
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        );
 
-    if (error) {
-      console.error("Erro ao carregar projetos:", error);
+      if (error) {
+        console.error(
+          "Erro ao carregar projetos:",
+          error
+        );
 
-      showToast(
-        "Não foi possível carregar os projetos.",
-        "error"
+        showToast(
+          "Não foi possível carregar os projetos.",
+          "error"
+        );
+
+        return [];
+      }
+
+      state.projects =
+        data || [];
+
+      return state.projects;
+
+    } catch (error) {
+      console.error(
+        "Erro ao carregar projetos:",
+        error
       );
 
       return [];
     }
-
-    state.projects = data || [];
-
-    return state.projects;
   }
 
 
   async function saveProject(event) {
     event.preventDefault();
 
-    const form = $("#projectForm");
+    const form =
+      $("#projectForm");
 
     if (!form) return;
 
-    const id = normalizeText(
-      $("#projectId")?.value
-    );
+    if (!state.user) {
+      showMessage(
+        $("#projectMessage"),
+        "Sua sessão expirou. Entre novamente.",
+        "error"
+      );
 
-    const clientId = normalizeText(
-      $("#projectClient")?.value
-    );
+      return;
+    }
 
-    const templateId = normalizeText(
-      $("#projectTemplate")?.value
-    );
+    const id =
+      normalizeText(
+        $("#projectId")?.value
+      );
 
-    const name = normalizeText(
-      $("#projectName")?.value
-    );
+    const clientId =
+      normalizeText(
+        $("#projectClient")?.value
+      );
 
-    if (!name || !clientId || !templateId) {
+    const templateId =
+      normalizeText(
+        $("#projectTemplate")?.value
+      );
+
+    const name =
+      normalizeText(
+        $("#projectName")?.value
+      );
+
+    if (
+      !name ||
+      !clientId ||
+      !templateId
+    ) {
       showMessage(
         $("#projectMessage"),
         "Preencha nome, cliente e modelo.",
@@ -658,15 +1189,22 @@
       return;
     }
 
-    const client = state.clients.find(
-      (item) => item.id === clientId
-    );
+    const client =
+      state.clients.find(
+        (item) =>
+          item.id === clientId
+      );
 
-    const template = state.templates.find(
-      (item) => item.id === templateId
-    );
+    const template =
+      state.templates.find(
+        (item) =>
+          item.id === templateId
+      );
 
-    if (!client || !template) {
+    if (
+      !client ||
+      !template
+    ) {
       showMessage(
         $("#projectMessage"),
         "Cliente ou modelo inválido.",
@@ -676,178 +1214,258 @@
       return;
     }
 
-    let slug = normalizeText(
-      $("#projectSlug")?.value
-    );
+    let slug =
+      normalizeText(
+        $("#projectSlug")?.value
+      );
 
     if (!slug) {
-      slug = slugify(name);
+      slug =
+        slugify(name);
     } else {
-      slug = slugify(slug);
+      slug =
+        slugify(slug);
     }
 
     const content = {
-      headline: normalizeText(
-        $("#projectHeadline")?.value
-      ),
+      headline:
+        normalizeText(
+          $("#projectHeadline")?.value
+        ),
 
-      description: normalizeText(
-        $("#projectDescription")?.value
-      ),
+      description:
+        normalizeText(
+          $("#projectDescription")?.value
+        ),
 
-      cta: normalizeText(
-        $("#projectCta")?.value
-      ),
+      cta:
+        normalizeText(
+          $("#projectCta")?.value
+        ),
 
       client: {
-        name: client.name || "",
-        category: client.category || "",
-        email: client.email || "",
-        phone: client.phone || "",
-        whatsapp: client.whatsapp || "",
-        instagram: client.instagram || "",
-        address: client.address || "",
-        hours: client.hours || "",
-        notes: client.notes || ""
+        name:
+          client.name || "",
+
+        category:
+          client.category || "",
+
+        email:
+          client.email || "",
+
+        phone:
+          client.phone || "",
+
+        whatsapp:
+          client.whatsapp || "",
+
+        instagram:
+          client.instagram || "",
+
+        address:
+          client.address || "",
+
+        hours:
+          client.hours || "",
+
+        notes:
+          client.notes || ""
       }
     };
 
     const payload = {
-      client_id: clientId,
-      template_id: templateId,
+      client_id:
+        clientId,
+
+      template_id:
+        templateId,
+
       name,
+
       slug,
+
       status:
         normalizeText(
           $("#projectStatus")?.value
         ) || "draft",
+
       content
     };
 
-    const button = form.querySelector(
-      'button[type="submit"]'
-    );
+    const button =
+      form.querySelector(
+        'button[type="submit"]'
+      );
 
     if (button) {
-      button.disabled = true;
-      button.textContent = "Salvando...";
+      button.disabled =
+        true;
+
+      button.textContent =
+        "Salvando...";
     }
 
-    let result;
+    try {
+      let result;
 
-    if (id) {
-      result = await supabaseClient
-        .from("digital_presence_projects")
-        .update(payload)
-        .eq("id", id)
-        .select(`
-          *,
-          client:digital_presence_clients (
-            id,
-            name,
-            category
-          ),
-          template:digital_presence_templates (
-            id,
-            slug,
-            name,
-            version
-          )
-        `)
-        .single();
-    } else {
-      result = await supabaseClient
-        .from("digital_presence_projects")
-        .insert({
-          ...payload,
-          created_by: state.user.id
-        })
-        .select(`
-          *,
-          client:digital_presence_clients (
-            id,
-            name,
-            category
-          ),
-          template:digital_presence_templates (
-            id,
-            slug,
-            name,
-            version
-          )
-        `)
-        .single();
-    }
+      if (id) {
+        result =
+          await supabaseClient
+            .from(
+              "digital_presence_projects"
+            )
+            .update(payload)
+            .eq("id", id)
+            .select(`
+              *,
+              client:digital_presence_clients (
+                id,
+                name,
+                category
+              ),
+              template:digital_presence_templates (
+                id,
+                slug,
+                name,
+                version
+              )
+            `)
+            .single();
 
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Salvar projeto";
-    }
-
-    if (result.error) {
-      console.error(result.error);
-
-      let message =
-        result.error.message ||
-        "Não foi possível salvar o projeto.";
-
-      if (
-        result.error.code === "23505" &&
-        result.error.message?.includes("slug")
-      ) {
-        message =
-          "Esse slug já está sendo usado. Escolha outro.";
+      } else {
+        result =
+          await supabaseClient
+            .from(
+              "digital_presence_projects"
+            )
+            .insert({
+              ...payload,
+              created_by:
+                state.user.id
+            })
+            .select(`
+              *,
+              client:digital_presence_clients (
+                id,
+                name,
+                category
+              ),
+              template:digital_presence_templates (
+                id,
+                slug,
+                name,
+                version
+              )
+            `)
+            .single();
       }
+
+      if (result.error) {
+        console.error(
+          result.error
+        );
+
+        let message =
+          result.error.message ||
+          "Não foi possível salvar o projeto.";
+
+        if (
+          result.error.code ===
+            "23505" &&
+          result.error.message?.includes(
+            "slug"
+          )
+        ) {
+          message =
+            "Esse slug já está sendo usado. Escolha outro.";
+        }
+
+        showMessage(
+          $("#projectMessage"),
+          message,
+          "error"
+        );
+
+        return;
+      }
+
+      state.currentProject =
+        result.data;
+
+      await loadProjects();
+
+      renderProjects();
+      renderDashboardProjects();
+      updateMetrics();
 
       showMessage(
         $("#projectMessage"),
-        message,
+        "Projeto salvo com sucesso.",
+        "success"
+      );
+
+      showToast(
+        id
+          ? "Projeto atualizado."
+          : "Projeto criado."
+      );
+
+    } catch (error) {
+      console.error(
+        "Erro ao salvar projeto:",
+        error
+      );
+
+      showMessage(
+        $("#projectMessage"),
+        error?.message ||
+          "Não foi possível salvar o projeto.",
         "error"
       );
 
-      return;
+    } finally {
+      if (button) {
+        button.disabled =
+          false;
+
+        button.textContent =
+          "Salvar projeto";
+      }
     }
-
-    state.currentProject = result.data;
-
-    await loadProjects();
-
-    renderProjects();
-    renderDashboardProjects();
-    updateMetrics();
-
-    showMessage(
-      $("#projectMessage"),
-      "Projeto salvo com sucesso.",
-      "success"
-    );
-
-    showToast(
-      id
-        ? "Projeto atualizado."
-        : "Projeto criado."
-    );
   }
 
 
-  function newProject(clientId = "") {
-    state.currentProject = null;
+  function newProject(
+    clientId = ""
+  ) {
+    state.currentProject =
+      null;
 
-    const form = $("#projectForm");
+    const form =
+      $("#projectForm");
 
     if (form) {
       form.reset();
     }
 
-    $("#projectId").value = "";
+    if ($("#projectId")) {
+      $("#projectId").value =
+        "";
+    }
 
-    $("#formTitle").textContent =
-      "Novo projeto";
+    if ($("#formTitle")) {
+      $("#formTitle").textContent =
+        "Novo projeto";
+    }
 
-    $("#projectStatus").value =
-      "draft";
+    if ($("#projectStatus")) {
+      $("#projectStatus").value =
+        "draft";
+    }
 
-    populateClientSelect(clientId);
+    populateClientSelect(
+      clientId
+    );
 
     populateTemplateSelect();
 
@@ -863,13 +1481,16 @@
 
 
   function editProject(id) {
-    const project = state.projects.find(
-      (item) => item.id === id
-    );
+    const project =
+      state.projects.find(
+        (item) =>
+          item.id === id
+      );
 
     if (!project) return;
 
-    state.currentProject = project;
+    state.currentProject =
+      project;
 
     $("#projectId").value =
       project.id || "";
@@ -889,7 +1510,8 @@
       project.slug || "";
 
     $("#projectStatus").value =
-      project.status || "draft";
+      project.status ||
+      "draft";
 
     const content =
       project.content || {};
@@ -920,47 +1542,66 @@
 
 
   async function archiveProject(id) {
-    const project = state.projects.find(
-      (item) => item.id === id
-    );
+    const project =
+      state.projects.find(
+        (item) =>
+          item.id === id
+      );
 
     if (!project) return;
 
-    const confirmed = window.confirm(
-      `Arquivar o projeto "${project.name}"?`
-    );
+    const confirmed =
+      window.confirm(
+        `Arquivar o projeto "${project.name}"?`
+      );
 
     if (!confirmed) return;
 
-    const {
-      error
-    } = await supabaseClient
-      .from("digital_presence_projects")
-      .update({
-        status: "archived"
-      })
-      .eq("id", id);
+    try {
+      const {
+        error
+      } = await supabaseClient
+        .from(
+          "digital_presence_projects"
+        )
+        .update({
+          status: "archived"
+        })
+        .eq("id", id);
 
-    if (error) {
-      console.error(error);
+      if (error) {
+        console.error(
+          error
+        );
+
+        showToast(
+          "Não foi possível arquivar o projeto.",
+          "error"
+        );
+
+        return;
+      }
+
+      await loadProjects();
+
+      renderProjects();
+      renderDashboardProjects();
+      updateMetrics();
+
+      showToast(
+        "Projeto arquivado."
+      );
+
+    } catch (error) {
+      console.error(
+        error
+      );
 
       showToast(
         "Não foi possível arquivar o projeto.",
         "error"
       );
-
-      return;
     }
-
-    await loadProjects();
-
-    renderProjects();
-    renderDashboardProjects();
-    updateMetrics();
-
-    showToast(
-      "Projeto arquivado."
-    );
   }
 
 
@@ -969,36 +1610,65 @@
   ======================================================== */
 
   async function loadTemplates() {
-    const {
-      data,
-      error
-    } = await supabaseClient
-      .from("digital_presence_templates")
-      .select("*")
-      .eq("active", true)
-      .order("name", {
-        ascending: true
-      });
+    if (!supabaseClient) {
+      return [];
+    }
 
-    if (error) {
-      console.error("Erro ao carregar modelos:", error);
+    try {
+      const {
+        data,
+        error
+      } = await supabaseClient
+        .from(
+          "digital_presence_templates"
+        )
+        .select("*")
+        .eq(
+          "active",
+          true
+        )
+        .order(
+          "name",
+          {
+            ascending: true
+          }
+        );
 
-      showToast(
-        "Não foi possível carregar os modelos.",
-        "error"
+      if (error) {
+        console.error(
+          "Erro ao carregar modelos:",
+          error
+        );
+
+        showToast(
+          "Não foi possível carregar os modelos.",
+          "error"
+        );
+
+        return [];
+      }
+
+      state.templates =
+        data || [];
+
+      return state.templates;
+
+    } catch (error) {
+      console.error(
+        "Erro ao carregar modelos:",
+        error
       );
 
       return [];
     }
-
-    state.templates = data || [];
-
-    return state.templates;
   }
 
 
-  function populateClientSelect(selectedId = "") {
-    const select = $("#projectClient");
+  function populateClientSelect(
+    selectedId = ""
+  ) {
+    const select =
+      $("#projectClient");
 
     if (!select) return;
 
@@ -1013,29 +1683,41 @@
     state.clients
       .filter(
         (client) =>
-          client.status !== "archived"
+          client.status !==
+          "archived"
       )
-      .forEach((client) => {
-        options.push(`
-          <option
-            value="${escapeHtml(client.id)}"
-            ${
-              client.id === selectedId
-                ? "selected"
-                : ""
-            }
-          >
-            ${escapeHtml(client.name)}
-          </option>
-        `);
-      });
+      .forEach(
+        (client) => {
+          options.push(`
+            <option
+              value="${escapeHtml(
+                client.id
+              )}"
+              ${
+                client.id ===
+                selectedId
+                  ? "selected"
+                  : ""
+              }
+            >
+              ${escapeHtml(
+                client.name
+              )}
+            </option>
+          `);
+        }
+      );
 
-    select.innerHTML = options.join("");
+    select.innerHTML =
+      options.join("");
   }
 
 
-  function populateTemplateSelect(selectedId = "") {
-    const select = $("#projectTemplate");
+  function populateTemplateSelect(
+    selectedId = ""
+  ) {
+    const select =
+      $("#projectTemplate");
 
     if (!select) return;
 
@@ -1047,31 +1729,44 @@
       `
     ];
 
-    state.templates.forEach((template) => {
-      options.push(`
-        <option
-          value="${escapeHtml(template.id)}"
-          ${
-            template.id === selectedId
-              ? "selected"
-              : ""
-          }
-        >
-          ${escapeHtml(template.name)}
-        </option>
-      `);
-    });
+    state.templates.forEach(
+      (template) => {
+        options.push(`
+          <option
+            value="${escapeHtml(
+              template.id
+            )}"
+            ${
+              template.id ===
+              selectedId
+                ? "selected"
+                : ""
+            }
+          >
+            ${escapeHtml(
+              template.name
+            )}
+          </option>
+        `);
+      }
+    );
 
-    select.innerHTML = options.join("");
+    select.innerHTML =
+      options.join("");
   }
 
 
-  function renderTemplateChoices(selectedId = "") {
-    const container = $("#templateChoices");
+  function renderTemplateChoices(
+    selectedId = ""
+  ) {
+    const container =
+      $("#templateChoices");
 
     if (!container) return;
 
-    if (!state.templates.length) {
+    if (
+      !state.templates.length
+    ) {
       container.innerHTML = `
         <div class="empty-state small">
           <span>◈</span>
@@ -1085,46 +1780,53 @@
 
     container.innerHTML =
       state.templates
-        .map((template) => {
-          const slugClass =
-            template.slug === "clean"
-              ? "clean"
-              : "premium";
+        .map(
+          (template) => {
+            const slugClass =
+              template.slug ===
+              "clean"
+                ? "clean"
+                : "premium";
 
-          return `
-            <button
-              type="button"
-              class="template-choice ${
-                template.id === selectedId
-                  ? "selected"
-                  : ""
-              }"
-              data-template-id="${escapeHtml(
-                template.id
-              )}"
-            >
+            return `
+              <button
+                type="button"
+                class="template-choice ${
+                  template.id ===
+                  selectedId
+                    ? "selected"
+                    : ""
+                }"
+                data-template-id="${escapeHtml(
+                  template.id
+                )}"
+              >
 
-              <span
-                class="template-choice-preview ${slugClass}"
-              ></span>
+                <span
+                  class="template-choice-preview ${slugClass}"
+                ></span>
 
-              <span class="template-choice-text">
+                <span class="template-choice-text">
 
-                <strong>
-                  ${escapeHtml(template.name)}
-                </strong>
+                  <strong>
+                    ${escapeHtml(
+                      template.name
+                    )}
+                  </strong>
 
-                <small>
-                  v${escapeHtml(
-                    template.version || "1.0"
-                  )}
-                </small>
+                  <small>
+                    v${escapeHtml(
+                      template.version ||
+                        "1.0"
+                    )}
+                  </small>
 
-              </span>
+                </span>
 
-            </button>
-          `;
-        })
+              </button>
+            `;
+          }
+        )
         .join("");
   }
 
@@ -1134,11 +1836,14 @@
   ======================================================== */
 
   function renderClients() {
-    const container = $("#clientList");
+    const container =
+      $("#clientList");
 
     if (!container) return;
 
-    if (!state.clients.length) {
+    if (
+      !state.clients.length
+    ) {
       container.innerHTML = `
         <div class="empty-state">
           <span>♙</span>
@@ -1157,96 +1862,101 @@
 
     container.innerHTML =
       state.clients
-        .map((client) => {
-          const archived =
-            client.status === "archived";
+        .map(
+          (client) => {
+            const archived =
+              client.status ===
+              "archived";
 
-          return `
-            <div class="client-item">
+            return `
+              <div class="client-item">
 
-              <div class="item-main">
+                <div class="item-main">
 
-                <div class="item-avatar">
-                  ${escapeHtml(
-                    firstLetter(client.name)
-                  )}
-                </div>
-
-                <div class="item-text">
-
-                  <strong>
+                  <div class="item-avatar">
                     ${escapeHtml(
-                      client.name
-                    )}
-                  </strong>
-
-                  <small>
-                    ${
-                      escapeHtml(
-                        client.category ||
-                        client.email ||
-                        "Cliente"
+                      firstLetter(
+                        client.name
                       )
-                    }
-                  </small>
+                    )}
+                  </div>
+
+                  <div class="item-text">
+
+                    <strong>
+                      ${escapeHtml(
+                        client.name
+                      )}
+                    </strong>
+
+                    <small>
+                      ${
+                        escapeHtml(
+                          client.category ||
+                            client.email ||
+                            "Cliente"
+                        )
+                      }
+                    </small>
+
+                  </div>
+
+                </div>
+
+                <div class="item-actions">
+
+                  ${
+                    archived
+                      ? `
+                        <span class="project-status archived">
+                          Arquivado
+                        </span>
+                      `
+                      : `
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          title="Novo projeto"
+                          data-action="new-project"
+                          data-client-id="${escapeHtml(
+                            client.id
+                          )}"
+                        >
+                          +
+                        </button>
+
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          title="Editar"
+                          data-action="edit-client"
+                          data-id="${escapeHtml(
+                            client.id
+                          )}"
+                        >
+                          ✎
+                        </button>
+
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          title="Arquivar"
+                          data-action="archive-client"
+                          data-id="${escapeHtml(
+                            client.id
+                          )}"
+                        >
+                          ×
+                        </button>
+                      `
+                  }
 
                 </div>
 
               </div>
-
-              <div class="item-actions">
-
-                ${
-                  archived
-                    ? `
-                      <span class="project-status archived">
-                        Arquivado
-                      </span>
-                    `
-                    : `
-                      <button
-                        type="button"
-                        class="icon-btn"
-                        title="Novo projeto"
-                        data-action="new-project"
-                        data-client-id="${escapeHtml(
-                          client.id
-                        )}"
-                      >
-                        +
-                      </button>
-
-                      <button
-                        type="button"
-                        class="icon-btn"
-                        title="Editar"
-                        data-action="edit-client"
-                        data-id="${escapeHtml(
-                          client.id
-                        )}"
-                      >
-                        ✎
-                      </button>
-
-                      <button
-                        type="button"
-                        class="icon-btn"
-                        title="Arquivar"
-                        data-action="archive-client"
-                        data-id="${escapeHtml(
-                          client.id
-                        )}"
-                      >
-                        ×
-                      </button>
-                    `
-                }
-
-              </div>
-
-            </div>
-          `;
-        })
+            `;
+          }
+        )
         .join("");
 
     renderDashboardClients();
@@ -1254,7 +1964,8 @@
 
 
   function renderDashboardClients() {
-    const container = $("#dashboardClients");
+    const container =
+      $("#dashboardClients");
 
     if (!container) return;
 
@@ -1262,7 +1973,8 @@
       state.clients
         .filter(
           (client) =>
-            client.status !== "archived"
+            client.status !==
+            "archived"
         )
         .slice(0, 5);
 
@@ -1290,7 +2002,9 @@
 
                 <div class="item-avatar">
                   ${escapeHtml(
-                    firstLetter(client.name)
+                    firstLetter(
+                      client.name
+                    )
                   )}
                 </div>
 
@@ -1306,7 +2020,7 @@
                     ${
                       escapeHtml(
                         client.category ||
-                        "Cliente"
+                          "Cliente"
                       )
                     }
                   </small>
@@ -1339,11 +2053,14 @@
   ======================================================== */
 
   function renderProjects() {
-    const container = $("#projectList");
+    const container =
+      $("#projectList");
 
     if (!container) return;
 
-    if (!state.projects.length) {
+    if (
+      !state.projects.length
+    ) {
       container.innerHTML = `
         <div class="empty-state">
           <span>▣</span>
@@ -1359,125 +2076,131 @@
 
     container.innerHTML =
       state.projects
-        .map((project) => {
-          const clientName =
-            project.client?.name ||
-            "Cliente";
+        .map(
+          (project) => {
+            const clientName =
+              project.client?.name ||
+              "Cliente";
 
-          const templateName =
-            project.template?.name ||
-            "Modelo";
+            const templateName =
+              project.template?.name ||
+              "Modelo";
 
-          return `
-            <div class="project-item">
+            return `
+              <div class="project-item">
 
-              <div class="item-main">
+                <div class="item-main">
 
-                <div class="item-avatar">
-                  ${escapeHtml(
-                    firstLetter(
-                      project.name
-                    )
-                  )}
-                </div>
-
-                <div class="item-text">
-
-                  <strong>
+                  <div class="item-avatar">
                     ${escapeHtml(
-                      project.name
-                    )}
-                  </strong>
-
-                  <small>
-                    ${escapeHtml(
-                      clientName
-                    )}
-                    ·
-                    ${escapeHtml(
-                      templateName
-                    )}
-                    ·
-                    ${escapeHtml(
-                      formatDate(
-                        project.created_at
+                      firstLetter(
+                        project.name
                       )
                     )}
-                  </small>
+                  </div>
+
+                  <div class="item-text">
+
+                    <strong>
+                      ${escapeHtml(
+                        project.name
+                      )}
+                    </strong>
+
+                    <small>
+                      ${escapeHtml(
+                        clientName
+                      )}
+                      ·
+                      ${escapeHtml(
+                        templateName
+                      )}
+                      ·
+                      ${escapeHtml(
+                        formatDate(
+                          project.created_at
+                        )
+                      )}
+                    </small>
+
+                  </div>
+
+                </div>
+
+                <div class="item-actions">
+
+                  <span
+                    class="project-status ${
+                      escapeHtml(
+                        project.status ||
+                          "draft"
+                      )
+                    }"
+                  >
+                    ${escapeHtml(
+                      statusLabel(
+                        project.status
+                      )
+                    )}
+                  </span>
+
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Editar projeto"
+                    data-action="edit-project"
+                    data-id="${escapeHtml(
+                      project.id
+                    )}"
+                  >
+                    ✎
+                  </button>
+
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Visualizar"
+                    data-action="preview-project"
+                    data-id="${escapeHtml(
+                      project.id
+                    )}"
+                  >
+                    ◉
+                  </button>
+
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    title="Arquivar"
+                    data-action="archive-project"
+                    data-id="${escapeHtml(
+                      project.id
+                    )}"
+                  >
+                    ×
+                  </button>
 
                 </div>
 
               </div>
-
-              <div class="item-actions">
-
-                <span
-                  class="project-status ${
-                    escapeHtml(
-                      project.status ||
-                      "draft"
-                    )
-                  }"
-                >
-                  ${escapeHtml(
-                    statusLabel(
-                      project.status
-                    )
-                  )}
-                </span>
-
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="Editar projeto"
-                  data-action="edit-project"
-                  data-id="${escapeHtml(
-                    project.id
-                  )}"
-                >
-                  ✎
-                </button>
-
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="Visualizar"
-                  data-action="preview-project"
-                  data-id="${escapeHtml(
-                    project.id
-                  )}"
-                >
-                  ◉
-                </button>
-
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="Arquivar"
-                  data-action="archive-project"
-                  data-id="${escapeHtml(
-                    project.id
-                  )}"
-                >
-                  ×
-                </button>
-
-              </div>
-
-            </div>
-          `;
-        })
+            `;
+          }
+        )
         .join("");
   }
 
 
   function renderDashboardProjects() {
-    const container = $("#dashboardProjects");
+    const container =
+      $("#dashboardProjects");
 
     if (!container) return;
 
     const projects =
-      state.projects.slice(0, 5);
+      state.projects.slice(
+        0,
+        5
+      );
 
     if (!projects.length) {
       container.innerHTML = `
@@ -1520,7 +2243,7 @@
                   <small>
                     ${escapeHtml(
                       project.client?.name ||
-                      "Cliente"
+                        "Cliente"
                     )}
                   </small>
 
@@ -1552,11 +2275,14 @@
   ======================================================== */
 
   function renderTemplates() {
-    const container = $("#templateList");
+    const container =
+      $("#templateList");
 
     if (!container) return;
 
-    if (!state.templates.length) {
+    if (
+      !state.templates.length
+    ) {
       container.innerHTML = `
         <div class="empty-state">
           <span>◈</span>
@@ -1572,62 +2298,67 @@
 
     container.innerHTML =
       state.templates
-        .map((template) => {
-          const slugClass =
-            template.slug === "clean"
-              ? "clean"
-              : "premium";
+        .map(
+          (template) => {
+            const slugClass =
+              template.slug ===
+              "clean"
+                ? "clean"
+                : "premium";
 
-          return `
-            <article class="template-card">
-
-              <div
-                class="template-preview ${slugClass}"
-              >
+            return `
+              <article class="template-card">
 
                 <div
-                  class="preview-decoration"
-                ></div>
+                  class="template-preview ${slugClass}"
+                >
 
-              </div>
-
-              <div class="template-info">
-
-                <h3>
-                  ${escapeHtml(
-                    template.name
-                  )}
-                </h3>
-
-                <p>
-                  ${escapeHtml(
-                    template.description ||
-                    "Modelo para presença digital."
-                  )}
-                </p>
-
-                <div class="template-meta">
-
-                  <span>
-                    ${template.active
-                      ? "Ativo"
-                      : "Inativo"}
-                  </span>
-
-                  <span class="template-version">
-                    v${escapeHtml(
-                      template.version ||
-                      "1.0"
-                    )}
-                  </span>
+                  <div
+                    class="preview-decoration"
+                  ></div>
 
                 </div>
 
-              </div>
+                <div class="template-info">
 
-            </article>
-          `;
-        })
+                  <h3>
+                    ${escapeHtml(
+                      template.name
+                    )}
+                  </h3>
+
+                  <p>
+                    ${escapeHtml(
+                      template.description ||
+                        "Modelo para presença digital."
+                    )}
+                  </p>
+
+                  <div class="template-meta">
+
+                    <span>
+                      ${
+                        template.active
+                          ? "Ativo"
+                          : "Inativo"
+                      }
+                    </span>
+
+                    <span class="template-version">
+                      v${escapeHtml(
+                        template.version ||
+                          "1.0"
+                      )}
+                    </span>
+
+                  </div>
+
+                </div>
+
+              </article>
+            `;
+          }
+        )
         .join("");
   }
 
@@ -1640,13 +2371,15 @@
     const activeClients =
       state.clients.filter(
         (client) =>
-          client.status !== "archived"
+          client.status !==
+          "archived"
       );
 
     const publishedProjects =
       state.projects.filter(
         (project) =>
-          project.status === "published"
+          project.status ===
+          "published"
       );
 
     if ($("#clientCount")) {
@@ -1685,7 +2418,9 @@
      PREVIEW
   ======================================================== */
 
-  function getProjectPreviewData(project) {
+  function getProjectPreviewData(
+    project
+  ) {
     const content =
       project.content || {};
 
@@ -1696,12 +2431,18 @@
 
     const headline =
       content.headline ||
-      `Conheça ${client.name || project.name}`;
+      `Conheça ${
+        client.name ||
+        project.name
+      }`;
 
     const description =
       content.description ||
       client.notes ||
-      `Uma presença digital criada pela Modulix para ${client.name || project.name}.`;
+      `Uma presença digital criada pela Modulix para ${
+        client.name ||
+        project.name
+      }.`;
 
     const cta =
       content.cta ||
@@ -1717,14 +2458,22 @@
   }
 
 
-  function whatsappUrl(phone) {
+  function whatsappUrl(
+    phone
+  ) {
     const digits =
       String(phone || "")
-        .replace(/\D/g, "");
+        .replace(
+          /\D/g,
+          ""
+        );
 
-    if (!digits) return "";
+    if (!digits) {
+      return "";
+    }
 
-    let normalized = digits;
+    let normalized =
+      digits;
 
     if (
       normalized.length >= 10 &&
@@ -1738,11 +2487,15 @@
   }
 
 
-  function safeInstagramUrl(value) {
+  function safeInstagramUrl(
+    value
+  ) {
     const text =
       normalizeText(value);
 
-    if (!text) return "";
+    if (!text) {
+      return "";
+    }
 
     if (
       /^https:\/\/(www\.)?instagram\.com\//i
@@ -1755,7 +2508,9 @@
   }
 
 
-  function buildPremiumPage(data) {
+  function buildPremiumPage(
+    data
+  ) {
     const project =
       data.project;
 
@@ -1774,7 +2529,7 @@
     const whatsapp =
       whatsappUrl(
         client.whatsapp ||
-        client.phone
+          client.phone
       );
 
     const instagram =
@@ -1810,7 +2565,7 @@
   <title>
     ${escapeHtml(
       client.name ||
-      project.name
+        project.name
     )}
   </title>
 
@@ -2081,7 +2836,7 @@
         <div class="brand">
           ${escapeHtml(
             client.name ||
-            project.name
+              project.name
           )}
           <span>•</span>
         </div>
@@ -2106,7 +2861,7 @@
         <div class="eyebrow">
           ${escapeHtml(
             client.category ||
-            "Negócio"
+              "Negócio"
           )}
         </div>
 
@@ -2182,8 +2937,8 @@
             <p>
               ${escapeHtml(
                 client.phone ||
-                client.email ||
-                "Entre em contato para mais informações."
+                  client.email ||
+                  "Entre em contato para mais informações."
               )}
             </p>
 
@@ -2199,7 +2954,7 @@
             <p>
               ${escapeHtml(
                 client.address ||
-                "Atendimento e informações disponíveis pelo contato."
+                  "Atendimento e informações disponíveis pelo contato."
               )}
             </p>
 
@@ -2215,7 +2970,7 @@
             <p>
               ${escapeHtml(
                 client.hours ||
-                "Consulte os horários de atendimento."
+                  "Consulte os horários de atendimento."
               )}
             </p>
 
@@ -2248,7 +3003,9 @@
   }
 
 
-  function buildCleanPage(data) {
+  function buildCleanPage(
+    data
+  ) {
     const project =
       data.project;
 
@@ -2267,7 +3024,7 @@
     const whatsapp =
       whatsappUrl(
         client.whatsapp ||
-        client.phone
+          client.phone
       );
 
     const instagram =
@@ -2303,7 +3060,7 @@
   <title>
     ${escapeHtml(
       client.name ||
-      project.name
+        project.name
     )}
   </title>
 
@@ -2528,7 +3285,7 @@
       <div class="brand">
         ${escapeHtml(
           client.name ||
-          project.name
+            project.name
         )}
       </div>
 
@@ -2546,7 +3303,7 @@
         <div class="category">
           ${escapeHtml(
             client.category ||
-            "Negócio"
+              "Negócio"
           )}
         </div>
 
@@ -2622,8 +3379,8 @@
             <p>
               ${escapeHtml(
                 client.phone ||
-                client.email ||
-                "Consulte o contato."
+                  client.email ||
+                  "Consulte o contato."
               )}
             </p>
 
@@ -2639,7 +3396,7 @@
             <p>
               ${escapeHtml(
                 client.address ||
-                "Consulte a localização."
+                  "Consulte a localização."
               )}
             </p>
 
@@ -2655,7 +3412,7 @@
             <p>
               ${escapeHtml(
                 client.hours ||
-                "Consulte os horários."
+                  "Consulte os horários."
               )}
             </p>
 
@@ -2688,7 +3445,9 @@
   }
 
 
-  function buildPreviewHtml(project) {
+  function buildPreviewHtml(
+    project
+  ) {
     const data =
       getProjectPreviewData(
         project
@@ -2703,18 +3462,28 @@
       )?.slug ||
       "premium";
 
-    if (slug === "clean") {
-      return buildCleanPage(data);
+    if (
+      slug === "clean"
+    ) {
+      return buildCleanPage(
+        data
+      );
     }
 
-    return buildPremiumPage(data);
+    return buildPremiumPage(
+      data
+    );
   }
 
 
-  function previewProject(id) {
-    const project = state.projects.find(
-      (item) => item.id === id
-    );
+  function previewProject(
+    id
+  ) {
+    const project =
+      state.projects.find(
+        (item) =>
+          item.id === id
+      );
 
     if (!project) {
       showToast(
@@ -2725,14 +3494,16 @@
       return;
     }
 
-    state.currentPreview = project;
+    state.currentPreview =
+      project;
 
     const title =
       $("#previewProjectTitle");
 
     if (title) {
       title.textContent =
-        project.name || "Pré-visualização";
+        project.name ||
+        "Pré-visualização";
     }
 
     const frame =
@@ -2741,7 +3512,9 @@
     if (!frame) return;
 
     frame.srcdoc =
-      buildPreviewHtml(project);
+      buildPreviewHtml(
+        project
+      );
 
     show("preview");
   }
@@ -2755,11 +3528,13 @@
 
     if (id) {
       previewProject(id);
+
       return;
     }
 
     const formData = {
       id: "preview",
+
       name:
         normalizeText(
           $("#projectName")?.value
@@ -2872,34 +3647,47 @@
       new Blob(
         [html],
         {
-          type: "text/html;charset=utf-8"
+          type:
+            "text/html;charset=utf-8"
         }
       );
 
     const url =
-      URL.createObjectURL(blob);
+      URL.createObjectURL(
+        blob
+      );
 
     const anchor =
-      document.createElement("a");
+      document.createElement(
+        "a"
+      );
 
-    anchor.href = url;
+    anchor.href =
+      url;
 
     anchor.download =
       `${slugify(
         project.slug ||
-        project.name ||
-        "presenca-digital"
+          project.name ||
+          "presenca-digital"
       )}.html`;
 
-    document.body.appendChild(anchor);
+    document.body.appendChild(
+      anchor
+    );
 
     anchor.click();
 
     anchor.remove();
 
-    window.setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 1000);
+    window.setTimeout(
+      () => {
+        URL.revokeObjectURL(
+          url
+        );
+      },
+      1000
+    );
 
     showToast(
       "HTML gerado com sucesso."
@@ -2959,40 +3747,53 @@
 
   function bindEvents() {
 
-    /* Login */
+    /* -----------------------------------------------------
+       LOGIN
+    ------------------------------------------------------ */
 
-    $("#loginForm")?.addEventListener(
-      "submit",
-      async (event) => {
-        event.preventDefault();
+    const loginForm =
+      $("#loginForm");
 
-        const email =
-          normalizeText(
-            $("#loginEmail")?.value
+    if (loginForm) {
+      loginForm.addEventListener(
+        "submit",
+        async (event) => {
+          event.preventDefault();
+
+          const email =
+            normalizeText(
+              $("#loginEmail")?.value
+            );
+
+          const password =
+            $("#loginPassword")?.value ||
+            "";
+
+          if (
+            !email ||
+            !password
+          ) {
+            showMessage(
+              $("#loginMessage"),
+              "Informe e-mail e senha.",
+              "error"
+            );
+
+            return;
+          }
+
+          await login(
+            email,
+            password
           );
-
-        const password =
-          $("#loginPassword")?.value || "";
-
-        if (!email || !password) {
-          showMessage(
-            $("#loginMessage"),
-            "Informe e-mail e senha.",
-            "error"
-          );
-
-          return;
         }
-
-        await login(
-          email,
-          password
-        );
-      }
-    );
+      );
+    }
 
 
-    /* Logout */
+    /* -----------------------------------------------------
+       LOGOUT
+    ------------------------------------------------------ */
 
     $("#logoutBtn")?.addEventListener(
       "click",
@@ -3000,14 +3801,26 @@
     );
 
 
-    /* Navegação */
+    /* -----------------------------------------------------
+       NAVEGAÇÃO / AÇÕES
+    ------------------------------------------------------ */
 
     document.addEventListener(
       "click",
       async (event) => {
+        const target =
+          event.target;
+
+        if (
+          !target ||
+          typeof target.closest !==
+            "function"
+        ) {
+          return;
+        }
 
         const element =
-          event.target.closest(
+          target.closest(
             "[data-view], [data-action]"
           );
 
@@ -3033,7 +3846,8 @@
 
 
         if (
-          action === "new-client"
+          action ===
+          "new-client"
         ) {
           event.preventDefault();
 
@@ -3046,13 +3860,14 @@
 
 
         if (
-          action === "new-project"
+          action ===
+          "new-project"
         ) {
           event.preventDefault();
 
           newProject(
             element.dataset.clientId ||
-            ""
+              ""
           );
 
           return;
@@ -3060,7 +3875,8 @@
 
 
         if (
-          action === "edit-client"
+          action ===
+          "edit-client"
         ) {
           event.preventDefault();
 
@@ -3073,7 +3889,8 @@
 
 
         if (
-          action === "archive-client"
+          action ===
+          "archive-client"
         ) {
           event.preventDefault();
 
@@ -3086,7 +3903,8 @@
 
 
         if (
-          action === "edit-project"
+          action ===
+          "edit-project"
         ) {
           event.preventDefault();
 
@@ -3099,7 +3917,8 @@
 
 
         if (
-          action === "archive-project"
+          action ===
+          "archive-project"
         ) {
           event.preventDefault();
 
@@ -3112,7 +3931,8 @@
 
 
         if (
-          action === "preview-project"
+          action ===
+          "preview-project"
         ) {
           event.preventDefault();
 
@@ -3125,7 +3945,8 @@
 
 
         if (
-          action === "close-preview"
+          action ===
+          "close-preview"
         ) {
           event.preventDefault();
 
@@ -3133,12 +3954,13 @@
 
           return;
         }
-
       }
     );
 
 
-    /* Form cliente */
+    /* -----------------------------------------------------
+       FORM CLIENTE
+    ------------------------------------------------------ */
 
     $("#clientForm")?.addEventListener(
       "submit",
@@ -3152,7 +3974,9 @@
     );
 
 
-    /* Form projeto */
+    /* -----------------------------------------------------
+       FORM PROJETO
+    ------------------------------------------------------ */
 
     $("#projectForm")?.addEventListener(
       "submit",
@@ -3172,7 +3996,9 @@
     );
 
 
-    /* Template select */
+    /* -----------------------------------------------------
+       TEMPLATE SELECT
+    ------------------------------------------------------ */
 
     $("#projectTemplate")?.addEventListener(
       "change",
@@ -3184,14 +4010,26 @@
     );
 
 
-    /* Template cards */
+    /* -----------------------------------------------------
+       TEMPLATE CARDS
+    ------------------------------------------------------ */
 
     $("#templateChoices")?.addEventListener(
       "click",
       (event) => {
+        const target =
+          event.target;
+
+        if (
+          !target ||
+          typeof target.closest !==
+            "function"
+        ) {
+          return;
+        }
 
         const choice =
-          event.target.closest(
+          target.closest(
             "[data-template-id]"
           );
 
@@ -3215,7 +4053,9 @@
     );
 
 
-    /* Menu mobile */
+    /* -----------------------------------------------------
+       MENU MOBILE
+    ------------------------------------------------------ */
 
     $("#mobileMenuBtn")?.addEventListener(
       "click",
@@ -3225,12 +4065,13 @@
     );
 
 
-    /* Fechar menu ao clicar fora */
+    /* -----------------------------------------------------
+       FECHAR MENU AO CLICAR FORA
+    ------------------------------------------------------ */
 
     document.addEventListener(
       "click",
       (event) => {
-
         const sidebar =
           $(".sidebar");
 
@@ -3240,7 +4081,8 @@
         if (!sidebar) return;
 
         if (
-          window.innerWidth > 820
+          window.innerWidth >
+          820
         ) {
           return;
         }
@@ -3259,7 +4101,6 @@
         closeMobileMenu();
       }
     );
-
   }
 
 
@@ -3268,35 +4109,48 @@
   ======================================================== */
 
   function bindAuthState() {
+    if (!supabaseClient) {
+      return;
+    }
 
     supabaseClient.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (
+        _event,
+        session
+      ) => {
+        try {
+          if (session?.user) {
+            state.user =
+              session.user;
 
-        if (session?.user) {
+            if (
+              $("#app")?.classList.contains(
+                "hidden"
+              )
+            ) {
+              await enterApp();
+            }
 
-          state.user =
-            session.user;
-
-          if (
-            $("#app")?.classList.contains(
-              "hidden"
-            )
-          ) {
-            await enterApp();
+            return;
           }
 
-          return;
+          state.user =
+            null;
+
+          $("#app")?.classList.add(
+            "hidden"
+          );
+
+          $("#loginScreen")?.classList.remove(
+            "hidden"
+          );
+
+        } catch (error) {
+          console.error(
+            "Erro no estado de autenticação:",
+            error
+          );
         }
-
-        state.user = null;
-
-        $("#app")?.classList.add(
-          "hidden"
-        );
-
-        $("#loginScreen")?.classList.remove(
-          "hidden"
-        );
       }
     );
   }
@@ -3307,6 +4161,33 @@
   ======================================================== */
 
   async function init() {
+    if (state.initialized) {
+      return;
+    }
+
+    state.initialized =
+      true;
+
+    const supabaseReady =
+      initializeSupabase();
+
+    if (!supabaseReady) {
+      $("#loginScreen")?.classList.remove(
+        "hidden"
+      );
+
+      $("#app")?.classList.add(
+        "hidden"
+      );
+
+      showMessage(
+        $("#loginMessage"),
+        "Não foi possível inicializar o Supabase. Verifique se supabase.js está carregando corretamente.",
+        "error"
+      );
+
+      return;
+    }
 
     bindEvents();
 
@@ -3316,7 +4197,6 @@
       await getSession();
 
     if (session?.user) {
-
       state.user =
         session.user;
 
@@ -3339,9 +4219,19 @@
      START
   ======================================================== */
 
-  document.addEventListener(
-    "DOMContentLoaded",
-    init
-  );
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+    document.addEventListener(
+      "DOMContentLoaded",
+      init,
+      {
+        once: true
+      }
+    );
+  } else {
+    init();
+  }
 
 })();
