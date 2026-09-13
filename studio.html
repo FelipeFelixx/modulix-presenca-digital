@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modulix Studio</title><link rel="stylesheet" href="studio.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+</head>
+<body>
+<header><a href="index.html"><b>Ｍ</b> MODULIX STUDIO</a><span>Presença Digital · V1</span></header>
+<main>
+<section class="hero"><div><small>✦ CENTRAL DE PRODUÇÃO</small><h1>Crie uma presença digital para cada cliente.</h1><p>Cadastre o negócio, escolha um modelo, preencha os dados e gere uma página personalizada sem editar código.</p></div><div class="status">● <strong>Studio operacional</strong><small>Dados salvos neste navegador</small></div></section>
+<nav><button data-tab="clients" class="active">Clientes <i id="count">0</i></button><button data-tab="new">+ Novo cliente</button><button data-tab="templates">Modelos</button><a href="index.html">← Página comercial</a></nav>
+
+<section id="clients" class="tab active"><div class="head"><div><small>CLIENTES</small><h2>Projetos cadastrados</h2></div><button id="newBtn">+ Novo cliente</button></div><div id="list"></div></section>
+
+<section id="new" class="tab"><div class="head"><div><small>PROJETO</small><h2 id="formTitle">Cadastrar cliente</h2></div><button class="ghost" id="cancelBtn">Cancelar</button></div>
+<form id="form">
+<input type="hidden" id="id">
+<div class="card"><h3>Identidade</h3><div class="grid"><label>Empresa<input id="name" required placeholder="Café Central"></label><label>Categoria<input id="category" required placeholder="Cafeteria"></label><label>Slogan<input id="slogan" placeholder="Uma frase que representa o negócio"></label><label>Cor principal<input id="accent" type="color" value="#c8a45d"></label></div></div>
+<div class="card"><h3>Apresentação</h3><label>Descrição<textarea id="description" rows="4" placeholder="Conte sobre a empresa..."></textarea></label></div>
+<div class="card"><h3>Serviços e produtos</h3><label>Um item por linha<textarea id="services" rows="5" placeholder="Café especial&#10;Bolos artesanais&#10;Brunch"></textarea></label></div>
+<div class="card"><h3>Contato</h3><div class="grid"><label>WhatsApp<input id="whatsapp" placeholder="5535999999999"></label><label>Telefone<input id="phone"></label><label>E-mail<input id="email" type="email"></label><label>Instagram<input id="instagram" placeholder="https://instagram.com/suaempresa"></label><label>Endereço<input id="address"></label><label>Horário<input id="hours" placeholder="Seg–Sex · 08h às 18h"></label></div></div>
+<div class="card"><h3>Modelo</h3><div class="models"><label><input type="radio" name="template" value="premium" checked> <b>Premium</b><span>Escuro e sofisticado</span></label><label><input type="radio" name="template" value="clean"> <b>Clean</b><span>Claro e minimalista</span></label></div></div>
+<div class="actions"><button type="submit">Salvar cliente</button><button type="button" id="createProjectBtn">Criar projeto</button><button type="button" class="ghost" id="previewBtn">Visualizar</button></div>
+</form></section>
+
+<section id="templates" class="tab"><div class="head"><div><small>MODELOS</small><h2>Biblioteca inicial</h2></div></div><div class="templateGrid"><article><div class="sample premium">MODULIX<br><strong>SUA MARCA</strong></div><h3>Premium</h3><p>Escuro, elegante e orientado a conversão.</p></article><article><div class="sample clean"><strong>SUA MARCA</strong><br>Presença clara.</div><h3>Clean</h3><p>Claro, direto e minimalista.</p></article></div></section>
+
+<section id="preview" class="preview"><div class="head"><div><small>PRÉ-VISUALIZAÇÃO</small><h2 id="previewName">Cliente</h2></div><div><button class="ghost" id="closePreview">Fechar</button> <button id="downloadBtn">Gerar página HTML</button></div></div><iframe id="frame" title="Pré-visualização"></iframe></section>
+</main><script src="studio.js"></script>
+</body></html>
