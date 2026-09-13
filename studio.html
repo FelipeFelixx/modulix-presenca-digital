@@ -1,4237 +1,1409 @@
-/* =========================================================
-   MODULIX STUDIO
-   Presença Digital
-   Supabase + Dashboard + Clientes + Projetos + Templates
-========================================================= */
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-(() => {
-  "use strict";
+  <title>Modulix Studio</title>
+  <meta
+    name="description"
+    content="Modulix Studio — criação e gerenciamento de Presença Digital."
+  >
 
-  /* =======================================================
-     CONFIGURAÇÃO / SEGURANÇA DE EXECUÇÃO
-  ======================================================== */
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-  const AUTH_TIMEOUT_MS = 15000;
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  >
 
-  /*
-    Impede que o navegador execute o comportamento nativo
-    GET do formulário de login caso algum outro trecho da
-    inicialização demore ou falhe.
+  <link rel="stylesheet" href="studio.css">
 
-    IMPORTANTE:
-    Não usamos stopPropagation().
-    O listener normal do login continua podendo executar.
-  */
-  document.addEventListener(
-    "submit",
-    (event) => {
-      const form = event.target;
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-      if (
-        form &&
-        form.id === "loginForm"
-      ) {
-        event.preventDefault();
-      }
-    },
-    true
-  );
+  <!-- Configuração pública do Supabase -->
+  <script src="supabase.js"></script>
+</head>
 
+<body>
 
-  /* =======================================================
-     SUPABASE
-  ======================================================== */
+  <!-- =========================================================
+       LOGIN
+  ========================================================== -->
 
-  let supabaseClient = null;
+  <section id="loginScreen" class="login-screen">
 
-  function initializeSupabase() {
-    try {
-      if (
-        !window.supabase ||
-        typeof window.supabase.createClient !== "function"
-      ) {
-        throw new Error(
-          "A biblioteca do Supabase não foi carregada."
-        );
-      }
+    <div class="login-card">
 
-      if (
-        typeof MODULIX_SUPABASE_URL === "undefined" ||
-        typeof MODULIX_SUPABASE_PUBLISHABLE_KEY === "undefined"
-      ) {
-        throw new Error(
-          "A configuração pública do Supabase não foi carregada."
-        );
-      }
+      <div class="brand-mark">
+        <span class="brand-icon">M</span>
 
-      supabaseClient =
-        window.supabase.createClient(
-          MODULIX_SUPABASE_URL,
-          MODULIX_SUPABASE_PUBLISHABLE_KEY
-        );
-
-      return true;
-
-    } catch (error) {
-      console.error(
-        "Erro ao inicializar Supabase:",
-        error
-      );
-
-      return false;
-    }
-  }
-
-
-  /* =======================================================
-     ESTADO
-  ======================================================== */
-
-  const state = {
-    user: null,
-    clients: [],
-    projects: [],
-    templates: [],
-    currentProject: null,
-    currentPreview: null,
-    initialized: false,
-    enteringApp: false
-  };
-
-
-  /* =======================================================
-     HELPERS DOM
-  ======================================================== */
-
-  const $ = (selector) =>
-    document.querySelector(selector);
-
-
-  const $$ = (selector) =>
-    Array.from(
-      document.querySelectorAll(selector)
-    );
-
-
-  /* =======================================================
-     HELPERS
-  ======================================================== */
-
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-
-  function normalizeText(value) {
-    return String(value ?? "").trim();
-  }
-
-
-  function slugify(value) {
-    return normalizeText(value)
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80);
-  }
-
-
-  function firstLetter(value) {
-    const text =
-      normalizeText(value);
-
-    return text
-      ? text.charAt(0).toUpperCase()
-      : "M";
-  }
-
-
-  function formatDate(value) {
-    if (!value) return "—";
-
-    const date =
-      new Date(value);
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return "—";
-    }
-
-    return new Intl.DateTimeFormat(
-      "pt-BR",
-      {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-      }
-    ).format(date);
-  }
-
-
-  function statusLabel(status) {
-    const labels = {
-      draft: "Rascunho",
-      review: "Em revisão",
-      approved: "Aprovado",
-      published: "Publicado",
-      archived: "Arquivado"
-    };
-
-    return (
-      labels[status] ||
-      status ||
-      "Rascunho"
-    );
-  }
-
-
-  function showMessage(
-    element,
-    message,
-    type = ""
-  ) {
-    if (!element) return;
-
-    element.textContent =
-      message || "";
-
-    element.className =
-      "form-message";
-
-    if (type) {
-      element.classList.add(type);
-    }
-  }
-
-
-  function showToast(
-    message,
-    type = "success"
-  ) {
-    const toast =
-      $("#toast");
-
-    const toastMessage =
-      $("#toastMessage");
-
-    const toastIcon =
-      $("#toastIcon");
-
-    if (
-      !toast ||
-      !toastMessage
-    ) {
-      return;
-    }
-
-    toastMessage.textContent =
-      message;
-
-    if (toastIcon) {
-      toastIcon.textContent =
-        type === "error"
-          ? "!"
-          : "✓";
-    }
-
-    toast.classList.add(
-      "show"
-    );
-
-    window.clearTimeout(
-      showToast.timer
-    );
-
-    showToast.timer =
-      window.setTimeout(
-        () => {
-          toast.classList.remove(
-            "show"
-          );
-        },
-        3000
-      );
-  }
-
-
-  function setLoading(
-    container,
-    message = "Carregando"
-  ) {
-    if (!container) return;
-
-    container.innerHTML = `
-      <div class="loading">
-        ${escapeHtml(message)}
-      </div>
-    `;
-  }
-
-
-  /* =======================================================
-     TIMEOUT
-  ======================================================== */
-
-  async function withTimeout(
-    promise,
-    message = "O servidor demorou para responder."
-  ) {
-    let timer = null;
-
-    const timeoutPromise =
-      new Promise(
-        (_, reject) => {
-          timer =
-            window.setTimeout(
-              () => {
-                reject(
-                  new Error(
-                    message
-                  )
-                );
-              },
-              AUTH_TIMEOUT_MS
-            );
-        }
-      );
-
-    try {
-      return await Promise.race([
-        promise,
-        timeoutPromise
-      ]);
-
-    } finally {
-      if (timer) {
-        window.clearTimeout(
-          timer
-        );
-      }
-    }
-  }
-
-
-  /* =======================================================
-     VIEW / NAVEGAÇÃO
-  ======================================================== */
-
-  const viewTitles = {
-    dashboard: "Dashboard",
-    clients: "Clientes",
-    projects: "Projetos",
-    templates: "Modelos",
-    editor: "Construtor",
-    preview: "Preview"
-  };
-
-
-  function show(viewName) {
-    const views =
-      $$(".view");
-
-    views.forEach(
-      (view) => {
-        view.classList.remove(
-          "active-view"
-        );
-      }
-    );
-
-    const target =
-      $(`#view-${viewName}`);
-
-    if (target) {
-      target.classList.add(
-        "active-view"
-      );
-    }
-
-    $$(".nav-item").forEach(
-      (item) => {
-        item.classList.toggle(
-          "active",
-          item.dataset.view ===
-            viewName
-        );
-      }
-    );
-
-    const title =
-      $("#pageTitle");
-
-    if (title) {
-      title.textContent =
-        viewTitles[viewName] ||
-        "Studio";
-    }
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
-
-    closeMobileMenu();
-  }
-
-
-  function openMobileMenu() {
-    $(".sidebar")?.classList.add(
-      "mobile-open"
-    );
-  }
-
-
-  function closeMobileMenu() {
-    $(".sidebar")?.classList.remove(
-      "mobile-open"
-    );
-  }
-
-
-  /* =======================================================
-     AUTH
-  ======================================================== */
-
-  async function getSession() {
-    if (!supabaseClient) {
-      return null;
-    }
-
-    try {
-      const result =
-        await withTimeout(
-          supabaseClient.auth.getSession(),
-          "O Supabase não respondeu ao verificar a sessão."
-        );
-
-      const {
-        data,
-        error
-      } = result;
-
-      if (error) {
-        console.error(
-          "Erro ao obter sessão:",
-          error
-        );
-
-        return null;
-      }
-
-      return data?.session || null;
-
-    } catch (error) {
-      console.error(
-        "Erro ao verificar sessão:",
-        error
-      );
-
-      return null;
-    }
-  }
-
-
-  async function login(
-    email,
-    password
-  ) {
-    const button =
-      $("#loginSubmit");
-
-    const message =
-      $("#loginMessage");
-
-    showMessage(
-      message,
-      "Entrando..."
-    );
-
-    if (button) {
-      button.disabled = true;
-      button.textContent =
-        "Entrando...";
-    }
-
-    try {
-      if (!supabaseClient) {
-        throw new Error(
-          "O Supabase não foi inicializado. Recarregue a página e tente novamente."
-        );
-      }
-
-      const result =
-        await withTimeout(
-          supabaseClient.auth.signInWithPassword({
-            email,
-            password
-          }),
-          "O Supabase não respondeu em 15 segundos. Verifique sua conexão e tente novamente."
-        );
-
-      const {
-        data,
-        error
-      } = result;
-
-      if (error) {
-        console.error(
-          "Erro de login:",
-          error
-        );
-
-        showMessage(
-          message,
-          error.message ||
-            "Não foi possível entrar.",
-          "error"
-        );
-
-        return;
-      }
-
-      if (!data?.user) {
-        showMessage(
-          message,
-          "O login não retornou um usuário válido.",
-          "error"
-        );
-
-        return;
-      }
-
-      state.user =
-        data.user;
-
-      showMessage(
-        message,
-        "Login realizado.",
-        "success"
-      );
-
-      await enterApp();
-
-    } catch (error) {
-      console.error(
-        "Erro inesperado no login:",
-        error
-      );
-
-      showMessage(
-        message,
-        error?.message ||
-          "Não foi possível realizar o login.",
-        "error"
-      );
-
-    } finally {
-      if (button) {
-        button.disabled =
-          false;
-
-        button.textContent =
-          "Entrar no Studio";
-      }
-    }
-  }
-
-
-  async function logout() {
-    if (!supabaseClient) {
-      state.user = null;
-
-      $("#app")?.classList.add(
-        "hidden"
-      );
-
-      $("#loginScreen")?.classList.remove(
-        "hidden"
-      );
-
-      return;
-    }
-
-    try {
-      const result =
-        await withTimeout(
-          supabaseClient.auth.signOut(),
-          "O Supabase não respondeu ao sair."
-        );
-
-      const {
-        error
-      } = result;
-
-      if (error) {
-        console.error(
-          error
-        );
-
-        showToast(
-          "Não foi possível sair.",
-          "error"
-        );
-
-        return;
-      }
-
-      state.user = null;
-      state.clients = [];
-      state.projects = [];
-      state.templates = [];
-      state.currentProject = null;
-      state.currentPreview = null;
-
-      $("#app")?.classList.add(
-        "hidden"
-      );
-
-      $("#loginScreen")?.classList.remove(
-        "hidden"
-      );
-
-      const loginMessage =
-        $("#loginMessage");
-
-      showMessage(
-        loginMessage,
-        "Sessão encerrada.",
-        "success"
-      );
-
-    } catch (error) {
-      console.error(
-        "Erro ao sair:",
-        error
-      );
-
-      showToast(
-        error?.message ||
-          "Não foi possível sair.",
-        "error"
-      );
-    }
-  }
-
-
-  async function enterApp() {
-    if (state.enteringApp) {
-      return;
-    }
-
-    state.enteringApp =
-      true;
-
-    try {
-      $("#loginScreen")?.classList.add(
-        "hidden"
-      );
-
-      $("#app")?.classList.remove(
-        "hidden"
-      );
-
-      updateUserInterface();
-
-      show("dashboard");
-
-      await loadAll();
-
-    } catch (error) {
-      console.error(
-        "Erro ao entrar no Studio:",
-        error
-      );
-
-      showToast(
-        "O Studio abriu, mas houve um erro ao carregar os dados.",
-        "error"
-      );
-
-    } finally {
-      state.enteringApp =
-        false;
-    }
-  }
-
-
-  function updateUserInterface() {
-    const emailElement =
-      $("#userEmail");
-
-    if (emailElement) {
-      emailElement.textContent =
-        state.user?.email ||
-        "Usuário";
-    }
-
-    const avatar =
-      $(".user-avatar");
-
-    if (avatar) {
-      avatar.textContent =
-        firstLetter(
-          state.user?.email ||
-            "M"
-        );
-    }
-  }
-
-
-  /* =======================================================
-     CLIENTES
-  ======================================================== */
-
-  async function loadClients() {
-    if (!supabaseClient) {
-      return [];
-    }
-
-    try {
-      const {
-        data,
-        error
-      } = await supabaseClient
-        .from(
-          "digital_presence_clients"
-        )
-        .select("*")
-        .order(
-          "created_at",
-          {
-            ascending: false
-          }
-        );
-
-      if (error) {
-        console.error(
-          "Erro ao carregar clientes:",
-          error
-        );
-
-        showToast(
-          "Não foi possível carregar os clientes.",
-          "error"
-        );
-
-        return [];
-      }
-
-      state.clients =
-        data || [];
-
-      return state.clients;
-
-    } catch (error) {
-      console.error(
-        "Erro ao carregar clientes:",
-        error
-      );
-
-      return [];
-    }
-  }
-
-
-  async function saveClient(event) {
-    event.preventDefault();
-
-    const form =
-      $("#clientForm");
-
-    if (!form) return;
-
-    if (!state.user) {
-      showMessage(
-        $("#clientMessage"),
-        "Sua sessão expirou. Entre novamente.",
-        "error"
-      );
-
-      return;
-    }
-
-    const id =
-      normalizeText(
-        $("#clientId")?.value
-      );
-
-    const payload = {
-      name:
-        normalizeText(
-          $("#clientName")?.value
-        ),
-
-      category:
-        normalizeText(
-          $("#clientCategory")?.value
-        ),
-
-      email:
-        normalizeText(
-          $("#clientEmail")?.value
-        ),
-
-      phone:
-        normalizeText(
-          $("#clientPhone")?.value
-        ),
-
-      whatsapp:
-        normalizeText(
-          $("#clientWhatsapp")?.value
-        ),
-
-      instagram:
-        normalizeText(
-          $("#clientInstagram")?.value
-        ),
-
-      address:
-        normalizeText(
-          $("#clientAddress")?.value
-        ),
-
-      hours:
-        normalizeText(
-          $("#clientHours")?.value
-        ),
-
-      notes:
-        normalizeText(
-          $("#clientNotes")?.value
-        )
-    };
-
-    if (!payload.name) {
-      showMessage(
-        $("#clientMessage"),
-        "Informe o nome ou empresa.",
-        "error"
-      );
-
-      return;
-    }
-
-    const button =
-      form.querySelector(
-        'button[type="submit"]'
-      );
-
-    if (button) {
-      button.disabled =
-        true;
-
-      button.textContent =
-        "Salvando...";
-    }
-
-    try {
-      let result;
-
-      if (id) {
-        result =
-          await supabaseClient
-            .from(
-              "digital_presence_clients"
-            )
-            .update(payload)
-            .eq("id", id)
-            .select()
-            .single();
-
-      } else {
-        result =
-          await supabaseClient
-            .from(
-              "digital_presence_clients"
-            )
-            .insert({
-              ...payload,
-              created_by:
-                state.user.id
-            })
-            .select()
-            .single();
-      }
-
-      if (result.error) {
-        console.error(
-          result.error
-        );
-
-        showMessage(
-          $("#clientMessage"),
-          result.error.message ||
-            "Não foi possível salvar o cliente.",
-          "error"
-        );
-
-        return;
-      }
-
-      await loadClients();
-
-      renderClients();
-      populateClientSelect();
-      updateMetrics();
-
-      resetClientForm();
-
-      showMessage(
-        $("#clientMessage"),
-        "Cliente salvo com sucesso.",
-        "success"
-      );
-
-      showToast(
-        id
-          ? "Cliente atualizado."
-          : "Cliente cadastrado."
-      );
-
-    } catch (error) {
-      console.error(
-        "Erro ao salvar cliente:",
-        error
-      );
-
-      showMessage(
-        $("#clientMessage"),
-        error?.message ||
-          "Não foi possível salvar o cliente.",
-        "error"
-      );
-
-    } finally {
-      if (button) {
-        button.disabled =
-          false;
-
-        button.textContent =
-          "Salvar cliente";
-      }
-    }
-  }
-
-
-  function editClient(id) {
-    const client =
-      state.clients.find(
-        (item) =>
-          item.id === id
-      );
-
-    if (!client) return;
-
-    $("#clientId").value =
-      client.id || "";
-
-    $("#clientName").value =
-      client.name || "";
-
-    $("#clientCategory").value =
-      client.category || "";
-
-    $("#clientEmail").value =
-      client.email || "";
-
-    $("#clientPhone").value =
-      client.phone || "";
-
-    $("#clientWhatsapp").value =
-      client.whatsapp || "";
-
-    $("#clientInstagram").value =
-      client.instagram || "";
-
-    $("#clientAddress").value =
-      client.address || "";
-
-    $("#clientHours").value =
-      client.hours || "";
-
-    $("#clientNotes").value =
-      client.notes || "";
-
-    const title =
-      $("#clientFormTitle");
-
-    if (title) {
-      title.textContent =
-        "Editar cliente";
-    }
-
-    show("clients");
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
-  }
-
-
-  function resetClientForm() {
-    const form =
-      $("#clientForm");
-
-    if (form) {
-      form.reset();
-    }
-
-    if ($("#clientId")) {
-      $("#clientId").value =
-        "";
-    }
-
-    if ($("#clientFormTitle")) {
-      $("#clientFormTitle").textContent =
-        "Novo cliente";
-    }
-
-    showMessage(
-      $("#clientMessage"),
-      ""
-    );
-  }
-
-
-  async function archiveClient(id) {
-    const client =
-      state.clients.find(
-        (item) =>
-          item.id === id
-      );
-
-    if (!client) return;
-
-    const confirmed =
-      window.confirm(
-        `Arquivar o cliente "${client.name}"?`
-      );
-
-    if (!confirmed) return;
-
-    try {
-      const {
-        error
-      } = await supabaseClient
-        .from(
-          "digital_presence_clients"
-        )
-        .update({
-          status: "archived"
-        })
-        .eq("id", id);
-
-      if (error) {
-        console.error(
-          error
-        );
-
-        showToast(
-          "Não foi possível arquivar o cliente.",
-          "error"
-        );
-
-        return;
-      }
-
-      await loadClients();
-
-      renderClients();
-      populateClientSelect();
-      updateMetrics();
-
-      showToast(
-        "Cliente arquivado."
-      );
-
-    } catch (error) {
-      console.error(
-        error
-      );
-
-      showToast(
-        "Não foi possível arquivar o cliente.",
-        "error"
-      );
-    }
-  }
-
-
-  /* =======================================================
-     PROJETOS
-  ======================================================== */
-
-  async function loadProjects() {
-    if (!supabaseClient) {
-      return [];
-    }
-
-    try {
-      const {
-        data,
-        error
-      } = await supabaseClient
-        .from(
-          "digital_presence_projects"
-        )
-        .select(`
-          *,
-          client:digital_presence_clients (
-            id,
-            name,
-            category
-          ),
-          template:digital_presence_templates (
-            id,
-            slug,
-            name,
-            version
-          )
-        `)
-        .order(
-          "created_at",
-          {
-            ascending: false
-          }
-        );
-
-      if (error) {
-        console.error(
-          "Erro ao carregar projetos:",
-          error
-        );
-
-        showToast(
-          "Não foi possível carregar os projetos.",
-          "error"
-        );
-
-        return [];
-      }
-
-      state.projects =
-        data || [];
-
-      return state.projects;
-
-    } catch (error) {
-      console.error(
-        "Erro ao carregar projetos:",
-        error
-      );
-
-      return [];
-    }
-  }
-
-
-  async function saveProject(event) {
-    event.preventDefault();
-
-    const form =
-      $("#projectForm");
-
-    if (!form) return;
-
-    if (!state.user) {
-      showMessage(
-        $("#projectMessage"),
-        "Sua sessão expirou. Entre novamente.",
-        "error"
-      );
-
-      return;
-    }
-
-    const id =
-      normalizeText(
-        $("#projectId")?.value
-      );
-
-    const clientId =
-      normalizeText(
-        $("#projectClient")?.value
-      );
-
-    const templateId =
-      normalizeText(
-        $("#projectTemplate")?.value
-      );
-
-    const name =
-      normalizeText(
-        $("#projectName")?.value
-      );
-
-    if (
-      !name ||
-      !clientId ||
-      !templateId
-    ) {
-      showMessage(
-        $("#projectMessage"),
-        "Preencha nome, cliente e modelo.",
-        "error"
-      );
-
-      return;
-    }
-
-    const client =
-      state.clients.find(
-        (item) =>
-          item.id === clientId
-      );
-
-    const template =
-      state.templates.find(
-        (item) =>
-          item.id === templateId
-      );
-
-    if (
-      !client ||
-      !template
-    ) {
-      showMessage(
-        $("#projectMessage"),
-        "Cliente ou modelo inválido.",
-        "error"
-      );
-
-      return;
-    }
-
-    let slug =
-      normalizeText(
-        $("#projectSlug")?.value
-      );
-
-    if (!slug) {
-      slug =
-        slugify(name);
-    } else {
-      slug =
-        slugify(slug);
-    }
-
-    const content = {
-      headline:
-        normalizeText(
-          $("#projectHeadline")?.value
-        ),
-
-      description:
-        normalizeText(
-          $("#projectDescription")?.value
-        ),
-
-      cta:
-        normalizeText(
-          $("#projectCta")?.value
-        ),
-
-      client: {
-        name:
-          client.name || "",
-
-        category:
-          client.category || "",
-
-        email:
-          client.email || "",
-
-        phone:
-          client.phone || "",
-
-        whatsapp:
-          client.whatsapp || "",
-
-        instagram:
-          client.instagram || "",
-
-        address:
-          client.address || "",
-
-        hours:
-          client.hours || "",
-
-        notes:
-          client.notes || ""
-      }
-    };
-
-    const payload = {
-      client_id:
-        clientId,
-
-      template_id:
-        templateId,
-
-      name,
-
-      slug,
-
-      status:
-        normalizeText(
-          $("#projectStatus")?.value
-        ) || "draft",
-
-      content
-    };
-
-    const button =
-      form.querySelector(
-        'button[type="submit"]'
-      );
-
-    if (button) {
-      button.disabled =
-        true;
-
-      button.textContent =
-        "Salvando...";
-    }
-
-    try {
-      let result;
-
-      if (id) {
-        result =
-          await supabaseClient
-            .from(
-              "digital_presence_projects"
-            )
-            .update(payload)
-            .eq("id", id)
-            .select(`
-              *,
-              client:digital_presence_clients (
-                id,
-                name,
-                category
-              ),
-              template:digital_presence_templates (
-                id,
-                slug,
-                name,
-                version
-              )
-            `)
-            .single();
-
-      } else {
-        result =
-          await supabaseClient
-            .from(
-              "digital_presence_projects"
-            )
-            .insert({
-              ...payload,
-              created_by:
-                state.user.id
-            })
-            .select(`
-              *,
-              client:digital_presence_clients (
-                id,
-                name,
-                category
-              ),
-              template:digital_presence_templates (
-                id,
-                slug,
-                name,
-                version
-              )
-            `)
-            .single();
-      }
-
-      if (result.error) {
-        console.error(
-          result.error
-        );
-
-        let message =
-          result.error.message ||
-          "Não foi possível salvar o projeto.";
-
-        if (
-          result.error.code ===
-            "23505" &&
-          result.error.message?.includes(
-            "slug"
-          )
-        ) {
-          message =
-            "Esse slug já está sendo usado. Escolha outro.";
-        }
-
-        showMessage(
-          $("#projectMessage"),
-          message,
-          "error"
-        );
-
-        return;
-      }
-
-      state.currentProject =
-        result.data;
-
-      await loadProjects();
-
-      renderProjects();
-      renderDashboardProjects();
-      updateMetrics();
-
-      showMessage(
-        $("#projectMessage"),
-        "Projeto salvo com sucesso.",
-        "success"
-      );
-
-      showToast(
-        id
-          ? "Projeto atualizado."
-          : "Projeto criado."
-      );
-
-    } catch (error) {
-      console.error(
-        "Erro ao salvar projeto:",
-        error
-      );
-
-      showMessage(
-        $("#projectMessage"),
-        error?.message ||
-          "Não foi possível salvar o projeto.",
-        "error"
-      );
-
-    } finally {
-      if (button) {
-        button.disabled =
-          false;
-
-        button.textContent =
-          "Salvar projeto";
-      }
-    }
-  }
-
-
-  function newProject(
-    clientId = ""
-  ) {
-    state.currentProject =
-      null;
-
-    const form =
-      $("#projectForm");
-
-    if (form) {
-      form.reset();
-    }
-
-    if ($("#projectId")) {
-      $("#projectId").value =
-        "";
-    }
-
-    if ($("#formTitle")) {
-      $("#formTitle").textContent =
-        "Novo projeto";
-    }
-
-    if ($("#projectStatus")) {
-      $("#projectStatus").value =
-        "draft";
-    }
-
-    populateClientSelect(
-      clientId
-    );
-
-    populateTemplateSelect();
-
-    renderTemplateChoices();
-
-    showMessage(
-      $("#projectMessage"),
-      ""
-    );
-
-    show("editor");
-  }
-
-
-  function editProject(id) {
-    const project =
-      state.projects.find(
-        (item) =>
-          item.id === id
-      );
-
-    if (!project) return;
-
-    state.currentProject =
-      project;
-
-    $("#projectId").value =
-      project.id || "";
-
-    $("#projectName").value =
-      project.name || "";
-
-    populateClientSelect(
-      project.client_id || ""
-    );
-
-    populateTemplateSelect(
-      project.template_id || ""
-    );
-
-    $("#projectSlug").value =
-      project.slug || "";
-
-    $("#projectStatus").value =
-      project.status ||
-      "draft";
-
-    const content =
-      project.content || {};
-
-    $("#projectHeadline").value =
-      content.headline || "";
-
-    $("#projectDescription").value =
-      content.description || "";
-
-    $("#projectCta").value =
-      content.cta || "";
-
-    $("#formTitle").textContent =
-      "Editar projeto";
-
-    showMessage(
-      $("#projectMessage"),
-      ""
-    );
-
-    renderTemplateChoices(
-      project.template_id || ""
-    );
-
-    show("editor");
-  }
-
-
-  async function archiveProject(id) {
-    const project =
-      state.projects.find(
-        (item) =>
-          item.id === id
-      );
-
-    if (!project) return;
-
-    const confirmed =
-      window.confirm(
-        `Arquivar o projeto "${project.name}"?`
-      );
-
-    if (!confirmed) return;
-
-    try {
-      const {
-        error
-      } = await supabaseClient
-        .from(
-          "digital_presence_projects"
-        )
-        .update({
-          status: "archived"
-        })
-        .eq("id", id);
-
-      if (error) {
-        console.error(
-          error
-        );
-
-        showToast(
-          "Não foi possível arquivar o projeto.",
-          "error"
-        );
-
-        return;
-      }
-
-      await loadProjects();
-
-      renderProjects();
-      renderDashboardProjects();
-      updateMetrics();
-
-      showToast(
-        "Projeto arquivado."
-      );
-
-    } catch (error) {
-      console.error(
-        error
-      );
-
-      showToast(
-        "Não foi possível arquivar o projeto.",
-        "error"
-      );
-    }
-  }
-
-
-  /* =======================================================
-     TEMPLATES
-  ======================================================== */
-
-  async function loadTemplates() {
-    if (!supabaseClient) {
-      return [];
-    }
-
-    try {
-      const {
-        data,
-        error
-      } = await supabaseClient
-        .from(
-          "digital_presence_templates"
-        )
-        .select("*")
-        .eq(
-          "active",
-          true
-        )
-        .order(
-          "name",
-          {
-            ascending: true
-          }
-        );
-
-      if (error) {
-        console.error(
-          "Erro ao carregar modelos:",
-          error
-        );
-
-        showToast(
-          "Não foi possível carregar os modelos.",
-          "error"
-        );
-
-        return [];
-      }
-
-      state.templates =
-        data || [];
-
-      return state.templates;
-
-    } catch (error) {
-      console.error(
-        "Erro ao carregar modelos:",
-        error
-      );
-
-      return [];
-    }
-  }
-
-
-  function populateClientSelect(
-    selectedId = ""
-  ) {
-    const select =
-      $("#projectClient");
-
-    if (!select) return;
-
-    const options = [
-      `
-        <option value="">
-          Selecione um cliente
-        </option>
-      `
-    ];
-
-    state.clients
-      .filter(
-        (client) =>
-          client.status !==
-          "archived"
-      )
-      .forEach(
-        (client) => {
-          options.push(`
-            <option
-              value="${escapeHtml(
-                client.id
-              )}"
-              ${
-                client.id ===
-                selectedId
-                  ? "selected"
-                  : ""
-              }
-            >
-              ${escapeHtml(
-                client.name
-              )}
-            </option>
-          `);
-        }
-      );
-
-    select.innerHTML =
-      options.join("");
-  }
-
-
-  function populateTemplateSelect(
-    selectedId = ""
-  ) {
-    const select =
-      $("#projectTemplate");
-
-    if (!select) return;
-
-    const options = [
-      `
-        <option value="">
-          Selecione um modelo
-        </option>
-      `
-    ];
-
-    state.templates.forEach(
-      (template) => {
-        options.push(`
-          <option
-            value="${escapeHtml(
-              template.id
-            )}"
-            ${
-              template.id ===
-              selectedId
-                ? "selected"
-                : ""
-            }
-          >
-            ${escapeHtml(
-              template.name
-            )}
-          </option>
-        `);
-      }
-    );
-
-    select.innerHTML =
-      options.join("");
-  }
-
-
-  function renderTemplateChoices(
-    selectedId = ""
-  ) {
-    const container =
-      $("#templateChoices");
-
-    if (!container) return;
-
-    if (
-      !state.templates.length
-    ) {
-      container.innerHTML = `
-        <div class="empty-state small">
-          <span>◈</span>
-          <strong>Nenhum modelo disponível</strong>
-          <p>Não existem modelos ativos.</p>
+        <div>
+          <strong>MODULIX</strong>
+          <small>STUDIO</small>
         </div>
-      `;
+      </div>
 
-      return;
-    }
+      <div class="login-heading">
+        <span class="eyebrow">MODULIX TECNOLOGIA</span>
 
-    container.innerHTML =
-      state.templates
-        .map(
-          (template) => {
-            const slugClass =
-              template.slug ===
-              "clean"
-                ? "clean"
-                : "premium";
+        <h1>
+          Presença Digital
+          <span>Studio</span>
+        </h1>
 
-            return `
-              <button
-                type="button"
-                class="template-choice ${
-                  template.id ===
-                  selectedId
-                    ? "selected"
-                    : ""
-                }"
-                data-template-id="${escapeHtml(
-                  template.id
-                )}"
-              >
+        <p>
+          Crie, organize e gerencie a presença digital dos seus clientes
+          em um único ambiente.
+        </p>
+      </div>
 
-                <span
-                  class="template-choice-preview ${slugClass}"
-                ></span>
+      <!--
+        method="post":
+        impede que os dados do formulário sejam enviados como GET.
 
-                <span class="template-choice-text">
+        novalidate:
+        deixa a validação sob controle do JavaScript do Studio.
+      -->
+      <form
+        id="loginForm"
+        class="login-form"
+        method="post"
+        novalidate
+      >
 
-                  <strong>
-                    ${escapeHtml(
-                      template.name
-                    )}
-                  </strong>
+        <div class="field">
 
-                  <small>
-                    v${escapeHtml(
-                      template.version ||
-                        "1.0"
-                    )}
-                  </small>
+          <label for="loginEmail">
+            E-mail
+          </label>
 
+          <input
+            id="loginEmail"
+            name="email"
+            type="email"
+            autocomplete="email"
+            placeholder="seu@email.com"
+            required
+          >
+
+        </div>
+
+        <div class="field">
+
+          <label for="loginPassword">
+            Senha
+          </label>
+
+          <input
+            id="loginPassword"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            required
+          >
+
+        </div>
+
+        <button
+          id="loginSubmit"
+          type="submit"
+          class="btn btn-primary btn-full"
+        >
+          Entrar no Studio
+        </button>
+
+        <p id="loginMessage" class="form-message"></p>
+
+      </form>
+
+      <div class="login-footer">
+        <span>Modulix Tecnologia</span>
+        <span>•</span>
+        <span>Ambiente interno</span>
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =========================================================
+       APLICAÇÃO
+  ========================================================== -->
+
+  <section id="app" class="app-shell hidden">
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+      <div class="sidebar-top">
+
+        <a href="#" class="studio-brand" data-view="dashboard">
+
+          <span class="brand-icon">M</span>
+
+          <div class="brand-text">
+            <strong>MODULIX</strong>
+            <small>STUDIO</small>
+          </div>
+
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <nav class="main-nav">
+
+          <button
+            type="button"
+            class="nav-item active"
+            data-view="dashboard"
+          >
+            <span class="nav-icon">⌂</span>
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            type="button"
+            class="nav-item"
+            data-view="clients"
+          >
+            <span class="nav-icon">♙</span>
+            <span>Clientes</span>
+          </button>
+
+          <button
+            type="button"
+            class="nav-item"
+            data-view="projects"
+          >
+            <span class="nav-icon">▣</span>
+            <span>Projetos</span>
+          </button>
+
+          <button
+            type="button"
+            class="nav-item"
+            data-view="templates"
+          >
+            <span class="nav-icon">◈</span>
+            <span>Modelos</span>
+          </button>
+
+        </nav>
+
+      </div>
+
+
+      <div class="sidebar-bottom">
+
+        <div class="sidebar-status">
+
+          <span class="status-dot"></span>
+
+          <div>
+            <strong>Studio online</strong>
+            <small>Supabase conectado</small>
+          </div>
+
+        </div>
+
+        <button
+          type="button"
+          id="logoutBtn"
+          class="logout-btn"
+        >
+          <span>↪</span>
+          Sair
+        </button>
+
+      </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+
+    <main class="main-content">
+
+      <!-- HEADER -->
+
+      <header class="topbar">
+
+        <div class="topbar-left">
+
+          <button
+            type="button"
+            id="mobileMenuBtn"
+            class="mobile-menu-btn"
+            aria-label="Abrir menu"
+          >
+            ☰
+          </button>
+
+          <div>
+
+            <span class="topbar-label">
+              MODULIX STUDIO
+            </span>
+
+            <h2 id="pageTitle">
+              Dashboard
+            </h2>
+
+          </div>
+
+        </div>
+
+
+        <div class="topbar-right">
+
+          <div class="user-info">
+
+            <span class="user-avatar">
+              M
+            </span>
+
+            <div>
+              <strong id="userEmail">
+                Usuário
+              </strong>
+
+              <small>
+                Operador
+              </small>
+            </div>
+
+          </div>
+
+        </div>
+
+      </header>
+
+
+      <!-- =====================================================
+           DASHBOARD
+      ====================================================== -->
+
+      <section
+        id="view-dashboard"
+        class="view active-view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              VISÃO GERAL
+            </span>
+
+            <h1>
+              Bem-vindo ao Studio.
+            </h1>
+
+            <p>
+              Centralize clientes, modelos e projetos de presença digital.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-view="clients"
+            data-action="new-client"
+          >
+            + Novo cliente
+          </button>
+
+        </div>
+
+
+        <!-- METRICS -->
+
+        <div class="metrics-grid">
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ♙
+            </div>
+
+            <div>
+              <span>Clientes</span>
+              <strong id="clientCount">0</strong>
+            </div>
+
+          </article>
+
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ▣
+            </div>
+
+            <div>
+              <span>Projetos</span>
+              <strong id="projectCount">0</strong>
+            </div>
+
+          </article>
+
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ◆
+            </div>
+
+            <div>
+              <span>Publicados</span>
+              <strong id="metricPublished">0</strong>
+            </div>
+
+          </article>
+
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ◈
+            </div>
+
+            <div>
+              <span>Modelos</span>
+              <strong id="templateCount">0</strong>
+            </div>
+
+          </article>
+
+        </div>
+
+
+        <!-- DASHBOARD CONTENT -->
+
+        <div class="dashboard-grid">
+
+          <article class="panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  CLIENTES
                 </span>
 
-              </button>
-            `;
-          }
-        )
-        .join("");
-  }
-
-
-  /* =======================================================
-     RENDER CLIENTES
-  ======================================================== */
-
-  function renderClients() {
-    const container =
-      $("#clientList");
-
-    if (!container) return;
-
-    if (
-      !state.clients.length
-    ) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <span>♙</span>
-          <strong>Nenhum cliente cadastrado</strong>
-          <p>
-            Use o formulário ao lado para adicionar
-            um cliente.
-          </p>
-        </div>
-      `;
-
-      renderDashboardClients();
-
-      return;
-    }
-
-    container.innerHTML =
-      state.clients
-        .map(
-          (client) => {
-            const archived =
-              client.status ===
-              "archived";
-
-            return `
-              <div class="client-item">
-
-                <div class="item-main">
-
-                  <div class="item-avatar">
-                    ${escapeHtml(
-                      firstLetter(
-                        client.name
-                      )
-                    )}
-                  </div>
-
-                  <div class="item-text">
-
-                    <strong>
-                      ${escapeHtml(
-                        client.name
-                      )}
-                    </strong>
-
-                    <small>
-                      ${
-                        escapeHtml(
-                          client.category ||
-                            client.email ||
-                            "Cliente"
-                        )
-                      }
-                    </small>
-
-                  </div>
-
-                </div>
-
-                <div class="item-actions">
-
-                  ${
-                    archived
-                      ? `
-                        <span class="project-status archived">
-                          Arquivado
-                        </span>
-                      `
-                      : `
-                        <button
-                          type="button"
-                          class="icon-btn"
-                          title="Novo projeto"
-                          data-action="new-project"
-                          data-client-id="${escapeHtml(
-                            client.id
-                          )}"
-                        >
-                          +
-                        </button>
-
-                        <button
-                          type="button"
-                          class="icon-btn"
-                          title="Editar"
-                          data-action="edit-client"
-                          data-id="${escapeHtml(
-                            client.id
-                          )}"
-                        >
-                          ✎
-                        </button>
-
-                        <button
-                          type="button"
-                          class="icon-btn"
-                          title="Arquivar"
-                          data-action="archive-client"
-                          data-id="${escapeHtml(
-                            client.id
-                          )}"
-                        >
-                          ×
-                        </button>
-                      `
-                  }
-
-                </div>
-
-              </div>
-            `;
-          }
-        )
-        .join("");
-
-    renderDashboardClients();
-  }
-
-
-  function renderDashboardClients() {
-    const container =
-      $("#dashboardClients");
-
-    if (!container) return;
-
-    const clients =
-      state.clients
-        .filter(
-          (client) =>
-            client.status !==
-            "archived"
-        )
-        .slice(0, 5);
-
-    if (!clients.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <span>♙</span>
-          <strong>Nenhum cliente cadastrado</strong>
-          <p>
-            Cadastre o primeiro cliente para começar.
-          </p>
-        </div>
-      `;
-
-      return;
-    }
-
-    container.innerHTML =
-      clients
-        .map(
-          (client) => `
-            <div class="client-item">
-
-              <div class="item-main">
-
-                <div class="item-avatar">
-                  ${escapeHtml(
-                    firstLetter(
-                      client.name
-                    )
-                  )}
-                </div>
-
-                <div class="item-text">
-
-                  <strong>
-                    ${escapeHtml(
-                      client.name
-                    )}
-                  </strong>
-
-                  <small>
-                    ${
-                      escapeHtml(
-                        client.category ||
-                          "Cliente"
-                      )
-                    }
-                  </small>
-
-                </div>
-
+                <h3>
+                  Clientes recentes
+                </h3>
               </div>
 
               <button
                 type="button"
-                class="icon-btn"
-                title="Editar cliente"
-                data-action="edit-client"
-                data-id="${escapeHtml(
-                  client.id
-                )}"
+                class="text-btn"
+                data-view="clients"
               >
-                →
+                Ver todos →
               </button>
 
             </div>
-          `
-        )
-        .join("");
-  }
+
+            <div
+              id="dashboardClients"
+              class="list-container"
+            >
+              <div class="empty-state">
+                <span>♙</span>
+                <strong>Nenhum cliente cadastrado</strong>
+                <p>Cadastre o primeiro cliente para começar.</p>
+              </div>
+            </div>
+
+          </article>
 
 
-  /* =======================================================
-     RENDER PROJETOS
-  ======================================================== */
+          <article class="panel">
 
-  function renderProjects() {
-    const container =
-      $("#projectList");
+            <div class="panel-header">
 
-    if (!container) return;
+              <div>
+                <span class="panel-kicker">
+                  PROJETOS
+                </span>
 
-    if (
-      !state.projects.length
-    ) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <span>▣</span>
-          <strong>Nenhum projeto criado</strong>
-          <p>
-            Crie um projeto para começar a gerar páginas.
-          </p>
+                <h3>
+                  Projetos recentes
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                class="text-btn"
+                data-view="projects"
+              >
+                Ver todos →
+              </button>
+
+            </div>
+
+            <div
+              id="dashboardProjects"
+              class="list-container"
+            >
+              <div class="empty-state">
+                <span>▣</span>
+                <strong>Nenhum projeto criado</strong>
+                <p>Crie um projeto a partir de um cliente.</p>
+              </div>
+            </div>
+
+          </article>
+
         </div>
-      `;
 
-      return;
-    }
 
-    container.innerHTML =
-      state.projects
-        .map(
-          (project) => {
-            const clientName =
-              project.client?.name ||
-              "Cliente";
+        <!-- QUICK START -->
 
-            const templateName =
-              project.template?.name ||
-              "Modelo";
+        <article class="quick-start">
 
-            return `
-              <div class="project-item">
+          <div class="quick-start-content">
 
-                <div class="item-main">
+            <span class="eyebrow">
+              FLUXO MODULIX
+            </span>
 
-                  <div class="item-avatar">
-                    ${escapeHtml(
-                      firstLetter(
-                        project.name
-                      )
-                    )}
+            <h2>
+              Da empresa à presença digital.
+            </h2>
+
+            <p>
+              Cadastre o cliente, escolha um modelo, preencha os dados
+              e gere uma página pronta para publicação.
+            </p>
+
+          </div>
+
+          <div class="quick-steps">
+
+            <div class="quick-step">
+              <span>01</span>
+              <strong>Cliente</strong>
+            </div>
+
+            <div class="quick-line"></div>
+
+            <div class="quick-step">
+              <span>02</span>
+              <strong>Modelo</strong>
+            </div>
+
+            <div class="quick-line"></div>
+
+            <div class="quick-step">
+              <span>03</span>
+              <strong>Conteúdo</strong>
+            </div>
+
+            <div class="quick-line"></div>
+
+            <div class="quick-step">
+              <span>04</span>
+              <strong>Presença</strong>
+            </div>
+
+          </div>
+
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           CLIENTES
+      ====================================================== -->
+
+      <section
+        id="view-clients"
+        class="view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              CRM
+            </span>
+
+            <h1>
+              Clientes
+            </h1>
+
+            <p>
+              Cadastre e organize as empresas atendidas pela Modulix.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-action="new-client"
+          >
+            + Novo cliente
+          </button>
+
+        </div>
+
+
+        <div class="content-grid">
+
+          <!-- FORM -->
+
+          <article class="panel form-panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  CADASTRO
+                </span>
+
+                <h3 id="clientFormTitle">
+                  Novo cliente
+                </h3>
+              </div>
+
+            </div>
+
+
+            <form id="clientForm">
+
+              <input
+                id="clientId"
+                type="hidden"
+              >
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>01</span>
+                  Informações principais
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientName">
+                    Nome / empresa *
+                  </label>
+
+                  <input
+                    id="clientName"
+                    type="text"
+                    placeholder="Ex.: Café Aurora"
+                    required
+                  >
+
+                </div>
+
+
+                <div class="form-row">
+
+                  <div class="field">
+
+                    <label for="clientCategory">
+                      Categoria
+                    </label>
+
+                    <input
+                      id="clientCategory"
+                      type="text"
+                      placeholder="Ex.: Restaurante"
+                    >
+
                   </div>
 
-                  <div class="item-text">
+                  <div class="field">
 
-                    <strong>
-                      ${escapeHtml(
-                        project.name
-                      )}
-                    </strong>
+                    <label for="clientEmail">
+                      E-mail
+                    </label>
 
-                    <small>
-                      ${escapeHtml(
-                        clientName
-                      )}
-                      ·
-                      ${escapeHtml(
-                        templateName
-                      )}
-                      ·
-                      ${escapeHtml(
-                        formatDate(
-                          project.created_at
-                        )
-                      )}
-                    </small>
+                    <input
+                      id="clientEmail"
+                      type="email"
+                      placeholder="contato@empresa.com"
+                    >
 
                   </div>
 
                 </div>
 
-                <div class="item-actions">
+              </div>
 
-                  <span
-                    class="project-status ${
-                      escapeHtml(
-                        project.status ||
-                          "draft"
-                      )
-                    }"
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>02</span>
+                  Contato
+                </div>
+
+
+                <div class="form-row">
+
+                  <div class="field">
+
+                    <label for="clientPhone">
+                      Telefone
+                    </label>
+
+                    <input
+                      id="clientPhone"
+                      type="tel"
+                      placeholder="(35) 99999-9999"
+                    >
+
+                  </div>
+
+                  <div class="field">
+
+                    <label for="clientWhatsapp">
+                      WhatsApp
+                    </label>
+
+                    <input
+                      id="clientWhatsapp"
+                      type="tel"
+                      placeholder="(35) 99999-9999"
+                    >
+
+                  </div>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientInstagram">
+                    Instagram
+                  </label>
+
+                  <input
+                    id="clientInstagram"
+                    type="url"
+                    placeholder="https://instagram.com/empresa"
                   >
-                    ${escapeHtml(
-                      statusLabel(
-                        project.status
-                      )
-                    )}
+
+                </div>
+
+              </div>
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>03</span>
+                  Localização e operação
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientAddress">
+                    Endereço
+                  </label>
+
+                  <input
+                    id="clientAddress"
+                    type="text"
+                    placeholder="Rua, número, bairro, cidade"
+                  >
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientHours">
+                    Horário de funcionamento
+                  </label>
+
+                  <textarea
+                    id="clientHours"
+                    rows="3"
+                    placeholder="Segunda a sexta: 08h às 18h..."
+                  ></textarea>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientNotes">
+                    Observações
+                  </label>
+
+                  <textarea
+                    id="clientNotes"
+                    rows="4"
+                    placeholder="Informações adicionais sobre o cliente..."
+                  ></textarea>
+
+                </div>
+
+              </div>
+
+
+              <div class="form-actions">
+
+                <button
+                  type="button"
+                  id="cancelClientBtn"
+                  class="btn btn-secondary"
+                >
+                  Limpar
+                </button>
+
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                >
+                  Salvar cliente
+                </button>
+
+              </div>
+
+              <p
+                id="clientMessage"
+                class="form-message"
+              ></p>
+
+            </form>
+
+          </article>
+
+
+          <!-- LIST -->
+
+          <article class="panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  BASE DE CLIENTES
+                </span>
+
+                <h3>
+                  Empresas
+                </h3>
+              </div>
+
+              <span
+                id="metricClients"
+                class="panel-counter"
+              >
+                0
+              </span>
+
+            </div>
+
+
+            <div
+              id="clientList"
+              class="list-container"
+            >
+              <div class="empty-state">
+                <span>♙</span>
+                <strong>Nenhum cliente cadastrado</strong>
+                <p>Use o formulário ao lado para adicionar um cliente.</p>
+              </div>
+            </div>
+
+          </article>
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================================
+           PROJETOS
+      ====================================================== -->
+
+      <section
+        id="view-projects"
+        class="view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              PRODUÇÃO
+            </span>
+
+            <h1>
+              Projetos
+            </h1>
+
+            <p>
+              Transforme os dados dos clientes em presenças digitais.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-action="new-project"
+          >
+            + Novo projeto
+          </button>
+
+        </div>
+
+
+        <article class="panel">
+
+          <div class="panel-header">
+
+            <div>
+              <span class="panel-kicker">
+                PROJETOS DIGITAIS
+              </span>
+
+              <h3>
+                Todos os projetos
+              </h3>
+            </div>
+
+            <span
+              id="metricProjects"
+              class="panel-counter"
+            >
+              0
+            </span>
+
+          </div>
+
+
+          <div
+            id="projectList"
+            class="project-list"
+          >
+            <div class="empty-state">
+              <span>▣</span>
+              <strong>Nenhum projeto criado</strong>
+              <p>Crie um projeto para começar a gerar páginas.</p>
+            </div>
+          </div>
+
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           MODELOS
+      ====================================================== -->
+
+      <section
+        id="view-templates"
+        class="view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              DESIGN SYSTEM
+            </span>
+
+            <h1>
+              Modelos
+            </h1>
+
+            <p>
+              Estruturas disponíveis para criação de presença digital.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div
+          id="templateList"
+          class="templates-grid"
+        >
+
+          <div class="empty-state">
+            <span>◈</span>
+            <strong>Carregando modelos...</strong>
+            <p>Buscando modelos disponíveis.</p>
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================================
+           EDITOR DE PROJETO
+      ====================================================== -->
+
+      <section
+        id="view-editor"
+        class="view"
+      >
+
+        <div class="page-intro editor-heading">
+
+          <div>
+
+            <button
+              type="button"
+              class="back-btn"
+              data-view="projects"
+            >
+              ← Voltar para projetos
+            </button>
+
+            <span class="eyebrow">
+              CONSTRUTOR
+            </span>
+
+            <h1 id="formTitle">
+              Novo projeto
+            </h1>
+
+            <p>
+              Configure o modelo e o conteúdo da presença digital.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="editor-grid">
+
+          <!-- EDITOR -->
+
+          <article class="panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  CONFIGURAÇÃO
+                </span>
+
+                <h3>
+                  Conteúdo
+                </h3>
+              </div>
+
+            </div>
+
+
+            <form id="projectForm">
+
+              <input
+                id="projectId"
+                type="hidden"
+              >
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>01</span>
+                  Projeto
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectName">
+                    Nome do projeto *
+                  </label>
+
+                  <input
+                    id="projectName"
+                    type="text"
+                    placeholder="Ex.: Presença Digital — Café Aurora"
+                    required
+                  >
+
+                </div>
+
+
+                <div class="form-row">
+
+                  <div class="field">
+
+                    <label for="projectClient">
+                      Cliente *
+                    </label>
+
+                    <select
+                      id="projectClient"
+                      required
+                    >
+                      <option value="">
+                        Selecione um cliente
+                      </option>
+                    </select>
+
+                  </div>
+
+
+                  <div class="field">
+
+                    <label for="projectTemplate">
+                      Modelo *
+                    </label>
+
+                    <select
+                      id="projectTemplate"
+                      required
+                    >
+                      <option value="">
+                        Selecione um modelo
+                      </option>
+                    </select>
+
+                  </div>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectSlug">
+                    Slug
+                  </label>
+
+                  <input
+                    id="projectSlug"
+                    type="text"
+                    placeholder="cafe-aurora"
+                  >
+
+                  <small class="field-help">
+                    Identificador utilizado futuramente para publicação.
+                  </small>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectStatus">
+                    Status
+                  </label>
+
+                  <select id="projectStatus">
+
+                    <option value="draft">
+                      Rascunho
+                    </option>
+
+                    <option value="review">
+                      Em revisão
+                    </option>
+
+                    <option value="approved">
+                      Aprovado
+                    </option>
+
+                    <option value="published">
+                      Publicado
+                    </option>
+
+                    <option value="archived">
+                      Arquivado
+                    </option>
+
+                  </select>
+
+                </div>
+
+              </div>
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>02</span>
+                  Conteúdo da presença
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectHeadline">
+                    Título principal
+                  </label>
+
+                  <input
+                    id="projectHeadline"
+                    type="text"
+                    placeholder="Uma experiência feita para você."
+                  >
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectDescription">
+                    Descrição
+                  </label>
+
+                  <textarea
+                    id="projectDescription"
+                    rows="4"
+                    placeholder="Descreva o negócio, seus diferenciais e sua proposta."
+                  ></textarea>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="projectCta">
+                    Texto do botão
+                  </label>
+
+                  <input
+                    id="projectCta"
+                    type="text"
+                    placeholder="Falar pelo WhatsApp"
+                  >
+
+                </div>
+
+              </div>
+
+
+              <div class="form-actions">
+
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  data-view="projects"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  id="previewBtn"
+                  class="btn btn-secondary"
+                >
+                  Visualizar
+                </button>
+
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                >
+                  Salvar projeto
+                </button>
+
+              </div>
+
+              <p
+                id="projectMessage"
+                class="form-message"
+              ></p>
+
+            </form>
+
+          </article>
+
+
+          <!-- TEMPLATE CHOICES -->
+
+          <aside class="editor-sidebar">
+
+            <article class="panel">
+
+              <div class="panel-header">
+
+                <div>
+                  <span class="panel-kicker">
+                    MODELOS
                   </span>
 
-                  <button
-                    type="button"
-                    class="icon-btn"
-                    title="Editar projeto"
-                    data-action="edit-project"
-                    data-id="${escapeHtml(
-                      project.id
-                    )}"
-                  >
-                    ✎
-                  </button>
-
-                  <button
-                    type="button"
-                    class="icon-btn"
-                    title="Visualizar"
-                    data-action="preview-project"
-                    data-id="${escapeHtml(
-                      project.id
-                    )}"
-                  >
-                    ◉
-                  </button>
-
-                  <button
-                    type="button"
-                    class="icon-btn"
-                    title="Arquivar"
-                    data-action="archive-project"
-                    data-id="${escapeHtml(
-                      project.id
-                    )}"
-                  >
-                    ×
-                  </button>
-
-                </div>
-
-              </div>
-            `;
-          }
-        )
-        .join("");
-  }
-
-
-  function renderDashboardProjects() {
-    const container =
-      $("#dashboardProjects");
-
-    if (!container) return;
-
-    const projects =
-      state.projects.slice(
-        0,
-        5
-      );
-
-    if (!projects.length) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <span>▣</span>
-          <strong>Nenhum projeto criado</strong>
-          <p>
-            Crie um projeto a partir de um cliente.
-          </p>
-        </div>
-      `;
-
-      return;
-    }
-
-    container.innerHTML =
-      projects
-        .map(
-          (project) => `
-            <div class="project-item">
-
-              <div class="item-main">
-
-                <div class="item-avatar">
-                  ${escapeHtml(
-                    firstLetter(
-                      project.name
-                    )
-                  )}
-                </div>
-
-                <div class="item-text">
-
-                  <strong>
-                    ${escapeHtml(
-                      project.name
-                    )}
-                  </strong>
-
-                  <small>
-                    ${escapeHtml(
-                      project.client?.name ||
-                        "Cliente"
-                    )}
-                  </small>
-
+                  <h3>
+                    Escolha o visual
+                  </h3>
                 </div>
 
               </div>
 
-              <button
-                type="button"
-                class="icon-btn"
-                title="Visualizar projeto"
-                data-action="preview-project"
-                data-id="${escapeHtml(
-                  project.id
-                )}"
+
+              <div
+                id="templateChoices"
+                class="template-choices"
               >
-                →
-              </button>
+
+                <div class="empty-state small">
+                  <span>◈</span>
+                  <strong>Carregando...</strong>
+                </div>
+
+              </div>
+
+            </article>
+
+
+            <article class="editor-tip">
+
+              <span class="tip-icon">
+                ✦
+              </span>
+
+              <div>
+
+                <strong>
+                  Dica
+                </strong>
+
+                <p>
+                  O conteúdo poderá ser ajustado posteriormente antes
+                  da publicação.
+                </p>
+
+              </div>
+
+            </article>
+
+          </aside>
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================================
+           PREVIEW
+      ====================================================== -->
+
+      <section
+        id="view-preview"
+        class="view preview-view"
+      >
+
+        <div class="preview-toolbar">
+
+          <div>
+
+            <button
+              type="button"
+              class="back-btn"
+              data-action="close-preview"
+            >
+              ← Voltar
+            </button>
+
+            <div class="preview-title">
+
+              <span class="eyebrow">
+                PREVIEW
+              </span>
+
+              <h1 id="previewProjectTitle">
+                Pré-visualização
+              </h1>
 
             </div>
-          `
-        )
-        .join("");
-  }
+
+          </div>
 
 
-  /* =======================================================
-     RENDER TEMPLATES
-  ======================================================== */
+          <div class="preview-actions">
 
-  function renderTemplates() {
-    const container =
-      $("#templateList");
+            <button
+              type="button"
+              id="downloadBtn"
+              class="btn btn-primary"
+            >
+              ↓ Gerar HTML
+            </button>
 
-    if (!container) return;
+          </div>
 
-    if (
-      !state.templates.length
-    ) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <span>◈</span>
-          <strong>Nenhum modelo disponível</strong>
-          <p>
-            Não existem modelos ativos no momento.
-          </p>
         </div>
-      `;
-
-      return;
-    }
-
-    container.innerHTML =
-      state.templates
-        .map(
-          (template) => {
-            const slugClass =
-              template.slug ===
-              "clean"
-                ? "clean"
-                : "premium";
-
-            return `
-              <article class="template-card">
-
-                <div
-                  class="template-preview ${slugClass}"
-                >
-
-                  <div
-                    class="preview-decoration"
-                  ></div>
-
-                </div>
-
-                <div class="template-info">
-
-                  <h3>
-                    ${escapeHtml(
-                      template.name
-                    )}
-                  </h3>
-
-                  <p>
-                    ${escapeHtml(
-                      template.description ||
-                        "Modelo para presença digital."
-                    )}
-                  </p>
-
-                  <div class="template-meta">
-
-                    <span>
-                      ${
-                        template.active
-                          ? "Ativo"
-                          : "Inativo"
-                      }
-                    </span>
-
-                    <span class="template-version">
-                      v${escapeHtml(
-                        template.version ||
-                          "1.0"
-                      )}
-                    </span>
-
-                  </div>
-
-                </div>
-
-              </article>
-            `;
-          }
-        )
-        .join("");
-  }
 
 
-  /* =======================================================
-     MÉTRICAS
-  ======================================================== */
+        <div class="browser-frame">
 
-  function updateMetrics() {
-    const activeClients =
-      state.clients.filter(
-        (client) =>
-          client.status !==
-          "archived"
-      );
+          <div class="browser-bar">
 
-    const publishedProjects =
-      state.projects.filter(
-        (project) =>
-          project.status ===
-          "published"
-      );
+            <div class="browser-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
 
-    if ($("#clientCount")) {
-      $("#clientCount").textContent =
-        activeClients.length;
-    }
+            <div class="browser-address">
+              modulix.digital / preview
+            </div>
 
-    if ($("#metricClients")) {
-      $("#metricClients").textContent =
-        activeClients.length;
-    }
-
-    if ($("#projectCount")) {
-      $("#projectCount").textContent =
-        state.projects.length;
-    }
-
-    if ($("#metricProjects")) {
-      $("#metricProjects").textContent =
-        state.projects.length;
-    }
-
-    if ($("#metricPublished")) {
-      $("#metricPublished").textContent =
-        publishedProjects.length;
-    }
-
-    if ($("#templateCount")) {
-      $("#templateCount").textContent =
-        state.templates.length;
-    }
-  }
+          </div>
 
 
-  /* =======================================================
-     PREVIEW
-  ======================================================== */
+          <iframe
+            id="frame"
+            title="Pré-visualização da presença digital"
+            sandbox=""
+          ></iframe>
 
-  function getProjectPreviewData(
-    project
-  ) {
-    const content =
-      project.content || {};
+        </div>
 
-    const client =
-      content.client ||
-      project.client ||
-      {};
+      </section>
 
-    const headline =
-      content.headline ||
-      `Conheça ${
-        client.name ||
-        project.name
-      }`;
+    </main>
 
-    const description =
-      content.description ||
-      client.notes ||
-      `Uma presença digital criada pela Modulix para ${
-        client.name ||
-        project.name
-      }.`;
-
-    const cta =
-      content.cta ||
-      "Falar pelo WhatsApp";
-
-    return {
-      project,
-      client,
-      headline,
-      description,
-      cta
-    };
-  }
+  </section>
 
 
-  function whatsappUrl(
-    phone
-  ) {
-    const digits =
-      String(phone || "")
-        .replace(
-          /\D/g,
-          ""
-        );
+  <!-- =========================================================
+       TOAST / NOTIFICAÇÕES
+  ========================================================== -->
 
-    if (!digits) {
-      return "";
-    }
-
-    let normalized =
-      digits;
-
-    if (
-      normalized.length >= 10 &&
-      normalized.length <= 11
-    ) {
-      normalized =
-        `55${normalized}`;
-    }
-
-    return `https://wa.me/${normalized}`;
-  }
-
-
-  function safeInstagramUrl(
-    value
-  ) {
-    const text =
-      normalizeText(value);
-
-    if (!text) {
-      return "";
-    }
-
-    if (
-      /^https:\/\/(www\.)?instagram\.com\//i
-        .test(text)
-    ) {
-      return text;
-    }
-
-    return "";
-  }
-
-
-  function buildPremiumPage(
-    data
-  ) {
-    const project =
-      data.project;
-
-    const client =
-      data.client;
-
-    const headline =
-      data.headline;
-
-    const description =
-      data.description;
-
-    const cta =
-      data.cta;
-
-    const whatsapp =
-      whatsappUrl(
-        client.whatsapp ||
-          client.phone
-      );
-
-    const instagram =
-      safeInstagramUrl(
-        client.instagram
-      );
-
-    return `
-<!DOCTYPE html>
-<html lang="pt-BR">
-
-<head>
-
-  <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
+  <div
+    id="toast"
+    class="toast"
+    role="status"
+    aria-live="polite"
   >
+    <span id="toastIcon">✓</span>
+    <span id="toastMessage">Operação realizada.</span>
+  </div>
 
-  <meta
-    name="description"
-    content="${escapeHtml(
-      description
-    )}"
-  >
 
-  <meta
-    http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:; base-uri 'none'; form-action 'none'; frame-ancestors 'none';"
-  >
+  <!-- =========================================================
+       JAVASCRIPT DO STUDIO
+  ========================================================== -->
 
-  <title>
-    ${escapeHtml(
-      client.name ||
-        project.name
-    )}
-  </title>
-
-  <style>
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
-    body {
-      margin: 0;
-
-      font-family:
-        Inter,
-        Arial,
-        sans-serif;
-
-      background:
-        radial-gradient(
-          circle at 80% 10%,
-          rgba(214,173,85,.16),
-          transparent 28%
-        ),
-        #080808;
-
-      color: #f5f5f5;
-
-      min-height: 100vh;
-    }
-
-    .page {
-      width: min(
-        1120px,
-        calc(100% - 40px)
-      );
-
-      margin: 0 auto;
-    }
-
-    header {
-      padding: 26px 0;
-    }
-
-    nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-    }
-
-    .brand {
-      font-weight: 800;
-      letter-spacing: .16em;
-      font-size: 13px;
-    }
-
-    .brand span {
-      color: #d6ad55;
-    }
-
-    .hero {
-      min-height: 78vh;
-
-      display: flex;
-      align-items: center;
-
-      padding:
-        80px 0
-        110px;
-    }
-
-    .eyebrow {
-      color: #d6ad55;
-
-      font-size: 11px;
-      font-weight: 800;
-
-      letter-spacing: .16em;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      max-width: 850px;
-
-      margin: 18px 0;
-
-      font-size:
-        clamp(
-          42px,
-          7vw,
-          84px
-        );
-
-      line-height: .98;
-
-      letter-spacing: -.055em;
-    }
-
-    .description {
-      max-width: 650px;
-
-      color: #b9b9b9;
-
-      font-size: 17px;
-      line-height: 1.75;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-
-      gap: 12px;
-
-      margin-top: 32px;
-    }
-
-    .btn {
-      display: inline-flex;
-
-      align-items: center;
-      justify-content: center;
-
-      min-height: 48px;
-
-      padding:
-        0 20px;
-
-      border-radius: 10px;
-
-      text-decoration: none;
-
-      font-size: 13px;
-      font-weight: 800;
-    }
-
-    .btn-primary {
-      background:
-        linear-gradient(
-          135deg,
-          #f0d28a,
-          #d6ad55
-        );
-
-      color: #101010;
-    }
-
-    .btn-secondary {
-      border:
-        1px solid
-        rgba(255,255,255,.12);
-
-      color: #ddd;
-
-      background:
-        rgba(255,255,255,.03);
-    }
-
-    section.info {
-      padding: 70px 0;
-
-      border-top:
-        1px solid
-        rgba(255,255,255,.08);
-    }
-
-    .grid {
-      display: grid;
-
-      grid-template-columns:
-        repeat(
-          3,
-          minmax(0, 1fr)
-        );
-
-      gap: 16px;
-    }
-
-    .card {
-      padding: 24px;
-
-      border:
-        1px solid
-        rgba(255,255,255,.08);
-
-      border-radius: 16px;
-
-      background:
-        rgba(255,255,255,.025);
-    }
-
-    .card strong {
-      display: block;
-
-      margin-bottom: 8px;
-
-      font-size: 14px;
-    }
-
-    .card p {
-      margin: 0;
-
-      color: #8f8f8f;
-
-      font-size: 12px;
-      line-height: 1.65;
-    }
-
-    footer {
-      padding: 35px 0 50px;
-
-      border-top:
-        1px solid
-        rgba(255,255,255,.08);
-
-      color: #666;
-
-      font-size: 11px;
-    }
-
-    @media (max-width: 700px) {
-
-      .page {
-        width:
-          min(
-            100% - 28px,
-            1120px
-          );
-      }
-
-      .hero {
-        min-height: 72vh;
-
-        padding:
-          55px 0
-          80px;
-      }
-
-      h1 {
-        font-size: 46px;
-      }
-
-      .description {
-        font-size: 15px;
-      }
-
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-    }
-
-  </style>
-
-</head>
-
-<body>
-
-  <header>
-
-    <div class="page">
-
-      <nav>
-
-        <div class="brand">
-          ${escapeHtml(
-            client.name ||
-              project.name
-          )}
-          <span>•</span>
-        </div>
-
-        <div class="eyebrow">
-          Presença Digital
-        </div>
-
-      </nav>
-
-    </div>
-
-  </header>
-
-
-  <main>
-
-    <section class="hero">
-
-      <div class="page">
-
-        <div class="eyebrow">
-          ${escapeHtml(
-            client.category ||
-              "Negócio"
-          )}
-        </div>
-
-        <h1>
-          ${escapeHtml(
-            headline
-          )}
-        </h1>
-
-        <p class="description">
-          ${escapeHtml(
-            description
-          )}
-        </p>
-
-        <div class="actions">
-
-          ${
-            whatsapp
-              ? `
-                <a
-                  class="btn btn-primary"
-                  href="${escapeHtml(
-                    whatsapp
-                  )}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  ${escapeHtml(
-                    cta
-                  )}
-                </a>
-              `
-              : ""
-          }
-
-          ${
-            instagram
-              ? `
-                <a
-                  class="btn btn-secondary"
-                  href="${escapeHtml(
-                    instagram
-                  )}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Instagram
-                </a>
-              `
-              : ""
-          }
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <section class="info">
-
-      <div class="page">
-
-        <div class="grid">
-
-          <article class="card">
-
-            <strong>
-              Contato
-            </strong>
-
-            <p>
-              ${escapeHtml(
-                client.phone ||
-                  client.email ||
-                  "Entre em contato para mais informações."
-              )}
-            </p>
-
-          </article>
-
-
-          <article class="card">
-
-            <strong>
-              Localização
-            </strong>
-
-            <p>
-              ${escapeHtml(
-                client.address ||
-                  "Atendimento e informações disponíveis pelo contato."
-              )}
-            </p>
-
-          </article>
-
-
-          <article class="card">
-
-            <strong>
-              Horários
-            </strong>
-
-            <p>
-              ${escapeHtml(
-                client.hours ||
-                  "Consulte os horários de atendimento."
-              )}
-            </p>
-
-          </article>
-
-        </div>
-
-      </div>
-
-    </section>
-
-  </main>
-
-
-  <footer>
-
-    <div class="page">
-
-      Presença digital criada com
-      Modulix Tecnologia.
-
-    </div>
-
-  </footer>
+  <script src="studio.js"></script>
 
 </body>
-
 </html>
-    `;
-  }
-
-
-  function buildCleanPage(
-    data
-  ) {
-    const project =
-      data.project;
-
-    const client =
-      data.client;
-
-    const headline =
-      data.headline;
-
-    const description =
-      data.description;
-
-    const cta =
-      data.cta;
-
-    const whatsapp =
-      whatsappUrl(
-        client.whatsapp ||
-          client.phone
-      );
-
-    const instagram =
-      safeInstagramUrl(
-        client.instagram
-      );
-
-    return `
-<!DOCTYPE html>
-<html lang="pt-BR">
-
-<head>
-
-  <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <meta
-    name="description"
-    content="${escapeHtml(
-      description
-    )}"
-  >
-
-  <meta
-    http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:; base-uri 'none'; form-action 'none'; frame-ancestors 'none';"
-  >
-
-  <title>
-    ${escapeHtml(
-      client.name ||
-        project.name
-    )}
-  </title>
-
-  <style>
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-
-      font-family:
-        Inter,
-        Arial,
-        sans-serif;
-
-      background: #f6f6f4;
-
-      color: #171717;
-    }
-
-    .page {
-      width:
-        min(
-          1080px,
-          calc(100% - 36px)
-        );
-
-      margin:
-        0 auto;
-    }
-
-    header {
-      padding: 28px 0;
-    }
-
-    .brand {
-      font-weight: 800;
-
-      font-size: 14px;
-
-      letter-spacing: .06em;
-    }
-
-    .hero {
-      padding:
-        100px 0
-        120px;
-    }
-
-    .category {
-      color: #777;
-
-      font-size: 11px;
-
-      font-weight: 800;
-
-      letter-spacing: .13em;
-
-      text-transform: uppercase;
-    }
-
-    h1 {
-      max-width: 780px;
-
-      margin:
-        16px 0
-        22px;
-
-      font-size:
-        clamp(
-          42px,
-          7vw,
-          78px
-        );
-
-      line-height: 1;
-
-      letter-spacing: -.055em;
-    }
-
-    .description {
-      max-width: 650px;
-
-      color: #666;
-
-      font-size: 17px;
-
-      line-height: 1.75;
-    }
-
-    .actions {
-      display: flex;
-
-      flex-wrap: wrap;
-
-      gap: 10px;
-
-      margin-top: 30px;
-    }
-
-    a {
-      display: inline-flex;
-
-      min-height: 46px;
-
-      align-items: center;
-      justify-content: center;
-
-      padding: 0 19px;
-
-      border-radius: 9px;
-
-      text-decoration: none;
-
-      font-size: 12px;
-
-      font-weight: 800;
-    }
-
-    .primary {
-      background: #171717;
-
-      color: #fff;
-    }
-
-    .secondary {
-      border:
-        1px solid
-        #ddd;
-
-      color: #333;
-    }
-
-    .grid {
-      display: grid;
-
-      grid-template-columns:
-        repeat(
-          3,
-          minmax(0, 1fr)
-        );
-
-      gap: 14px;
-
-      padding-bottom: 80px;
-    }
-
-    .card {
-      padding: 22px;
-
-      border:
-        1px solid
-        #e2e2df;
-
-      border-radius: 14px;
-
-      background: #fff;
-    }
-
-    .card strong {
-      display: block;
-
-      margin-bottom: 7px;
-
-      font-size: 13px;
-    }
-
-    .card p {
-      margin: 0;
-
-      color: #777;
-
-      font-size: 11px;
-
-      line-height: 1.6;
-    }
-
-    footer {
-      padding:
-        30px 0
-        45px;
-
-      border-top:
-        1px solid
-        #e2e2df;
-
-      color: #888;
-
-      font-size: 10px;
-    }
-
-    @media (max-width: 700px) {
-
-      h1 {
-        font-size: 45px;
-      }
-
-      .hero {
-        padding:
-          70px 0
-          80px;
-      }
-
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-    }
-
-  </style>
-
-</head>
-
-<body>
-
-  <header>
-
-    <div class="page">
-
-      <div class="brand">
-        ${escapeHtml(
-          client.name ||
-            project.name
-        )}
-      </div>
-
-    </div>
-
-  </header>
-
-
-  <main>
-
-    <section class="hero">
-
-      <div class="page">
-
-        <div class="category">
-          ${escapeHtml(
-            client.category ||
-              "Negócio"
-          )}
-        </div>
-
-        <h1>
-          ${escapeHtml(
-            headline
-          )}
-        </h1>
-
-        <p class="description">
-          ${escapeHtml(
-            description
-          )}
-        </p>
-
-        <div class="actions">
-
-          ${
-            whatsapp
-              ? `
-                <a
-                  class="primary"
-                  href="${escapeHtml(
-                    whatsapp
-                  )}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  ${escapeHtml(
-                    cta
-                  )}
-                </a>
-              `
-              : ""
-          }
-
-          ${
-            instagram
-              ? `
-                <a
-                  class="secondary"
-                  href="${escapeHtml(
-                    instagram
-                  )}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Instagram
-                </a>
-              `
-              : ""
-          }
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <section>
-
-      <div class="page">
-
-        <div class="grid">
-
-          <article class="card">
-
-            <strong>
-              Contato
-            </strong>
-
-            <p>
-              ${escapeHtml(
-                client.phone ||
-                  client.email ||
-                  "Consulte o contato."
-              )}
-            </p>
-
-          </article>
-
-
-          <article class="card">
-
-            <strong>
-              Endereço
-            </strong>
-
-            <p>
-              ${escapeHtml(
-                client.address ||
-                  "Consulte a localização."
-              )}
-            </p>
-
-          </article>
-
-
-          <article class="card">
-
-            <strong>
-              Horários
-            </strong>
-
-            <p>
-              ${escapeHtml(
-                client.hours ||
-                  "Consulte os horários."
-              )}
-            </p>
-
-          </article>
-
-        </div>
-
-      </div>
-
-    </section>
-
-  </main>
-
-
-  <footer>
-
-    <div class="page">
-
-      Presença digital criada com
-      Modulix Tecnologia.
-
-    </div>
-
-  </footer>
-
-</body>
-
-</html>
-    `;
-  }
-
-
-  function buildPreviewHtml(
-    project
-  ) {
-    const data =
-      getProjectPreviewData(
-        project
-      );
-
-    const slug =
-      project.template?.slug ||
-      state.templates.find(
-        (template) =>
-          template.id ===
-          project.template_id
-      )?.slug ||
-      "premium";
-
-    if (
-      slug === "clean"
-    ) {
-      return buildCleanPage(
-        data
-      );
-    }
-
-    return buildPremiumPage(
-      data
-    );
-  }
-
-
-  function previewProject(
-    id
-  ) {
-    const project =
-      state.projects.find(
-        (item) =>
-          item.id === id
-      );
-
-    if (!project) {
-      showToast(
-        "Projeto não encontrado.",
-        "error"
-      );
-
-      return;
-    }
-
-    state.currentPreview =
-      project;
-
-    const title =
-      $("#previewProjectTitle");
-
-    if (title) {
-      title.textContent =
-        project.name ||
-        "Pré-visualização";
-    }
-
-    const frame =
-      $("#frame");
-
-    if (!frame) return;
-
-    frame.srcdoc =
-      buildPreviewHtml(
-        project
-      );
-
-    show("preview");
-  }
-
-
-  function previewCurrentProject() {
-    const id =
-      normalizeText(
-        $("#projectId")?.value
-      );
-
-    if (id) {
-      previewProject(id);
-
-      return;
-    }
-
-    const formData = {
-      id: "preview",
-
-      name:
-        normalizeText(
-          $("#projectName")?.value
-        ) ||
-        "Pré-visualização",
-
-      template_id:
-        normalizeText(
-          $("#projectTemplate")?.value
-        ),
-
-      template:
-        state.templates.find(
-          (template) =>
-            template.id ===
-            normalizeText(
-              $("#projectTemplate")?.value
-            )
-        ),
-
-      client:
-        state.clients.find(
-          (client) =>
-            client.id ===
-            normalizeText(
-              $("#projectClient")?.value
-            )
-        ),
-
-      content: {
-        headline:
-          normalizeText(
-            $("#projectHeadline")?.value
-          ),
-
-        description:
-          normalizeText(
-            $("#projectDescription")?.value
-          ),
-
-        cta:
-          normalizeText(
-            $("#projectCta")?.value
-          )
-      }
-    };
-
-    if (!formData.client) {
-      showToast(
-        "Selecione um cliente antes de visualizar.",
-        "error"
-      );
-
-      return;
-    }
-
-    if (!formData.template) {
-      showToast(
-        "Selecione um modelo antes de visualizar.",
-        "error"
-      );
-
-      return;
-    }
-
-    state.currentPreview =
-      formData;
-
-    const title =
-      $("#previewProjectTitle");
-
-    if (title) {
-      title.textContent =
-        formData.name;
-    }
-
-    const frame =
-      $("#frame");
-
-    if (frame) {
-      frame.srcdoc =
-        buildPreviewHtml(
-          formData
-        );
-    }
-
-    show("preview");
-  }
-
-
-  function downloadCurrentProject() {
-    const project =
-      state.currentPreview;
-
-    if (!project) {
-      showToast(
-        "Nenhum projeto em preview.",
-        "error"
-      );
-
-      return;
-    }
-
-    const html =
-      buildPreviewHtml(
-        project
-      );
-
-    const blob =
-      new Blob(
-        [html],
-        {
-          type:
-            "text/html;charset=utf-8"
-        }
-      );
-
-    const url =
-      URL.createObjectURL(
-        blob
-      );
-
-    const anchor =
-      document.createElement(
-        "a"
-      );
-
-    anchor.href =
-      url;
-
-    anchor.download =
-      `${slugify(
-        project.slug ||
-          project.name ||
-          "presenca-digital"
-      )}.html`;
-
-    document.body.appendChild(
-      anchor
-    );
-
-    anchor.click();
-
-    anchor.remove();
-
-    window.setTimeout(
-      () => {
-        URL.revokeObjectURL(
-          url
-        );
-      },
-      1000
-    );
-
-    showToast(
-      "HTML gerado com sucesso."
-    );
-  }
-
-
-  /* =======================================================
-     LOAD GERAL
-  ======================================================== */
-
-  async function loadAll() {
-    const clientsContainer =
-      $("#clientList");
-
-    const projectsContainer =
-      $("#projectList");
-
-    if (clientsContainer) {
-      setLoading(
-        clientsContainer,
-        "Carregando clientes"
-      );
-    }
-
-    if (projectsContainer) {
-      setLoading(
-        projectsContainer,
-        "Carregando projetos"
-      );
-    }
-
-    await Promise.all([
-      loadClients(),
-      loadProjects(),
-      loadTemplates()
-    ]);
-
-    renderClients();
-    renderProjects();
-    renderDashboardClients();
-    renderDashboardProjects();
-    renderTemplates();
-
-    populateClientSelect();
-    populateTemplateSelect();
-
-    renderTemplateChoices();
-
-    updateMetrics();
-  }
-
-
-  /* =======================================================
-     EVENTOS
-  ======================================================== */
-
-  function bindEvents() {
-
-    /* -----------------------------------------------------
-       LOGIN
-    ------------------------------------------------------ */
-
-    const loginForm =
-      $("#loginForm");
-
-    if (loginForm) {
-      loginForm.addEventListener(
-        "submit",
-        async (event) => {
-          event.preventDefault();
-
-          const email =
-            normalizeText(
-              $("#loginEmail")?.value
-            );
-
-          const password =
-            $("#loginPassword")?.value ||
-            "";
-
-          if (
-            !email ||
-            !password
-          ) {
-            showMessage(
-              $("#loginMessage"),
-              "Informe e-mail e senha.",
-              "error"
-            );
-
-            return;
-          }
-
-          await login(
-            email,
-            password
-          );
-        }
-      );
-    }
-
-
-    /* -----------------------------------------------------
-       LOGOUT
-    ------------------------------------------------------ */
-
-    $("#logoutBtn")?.addEventListener(
-      "click",
-      logout
-    );
-
-
-    /* -----------------------------------------------------
-       NAVEGAÇÃO / AÇÕES
-    ------------------------------------------------------ */
-
-    document.addEventListener(
-      "click",
-      async (event) => {
-        const target =
-          event.target;
-
-        if (
-          !target ||
-          typeof target.closest !==
-            "function"
-        ) {
-          return;
-        }
-
-        const element =
-          target.closest(
-            "[data-view], [data-action]"
-          );
-
-        if (!element) return;
-
-        const view =
-          element.dataset.view;
-
-        const action =
-          element.dataset.action;
-
-
-        if (
-          view &&
-          !action
-        ) {
-          event.preventDefault();
-
-          show(view);
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "new-client"
-        ) {
-          event.preventDefault();
-
-          resetClientForm();
-
-          show("clients");
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "new-project"
-        ) {
-          event.preventDefault();
-
-          newProject(
-            element.dataset.clientId ||
-              ""
-          );
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "edit-client"
-        ) {
-          event.preventDefault();
-
-          editClient(
-            element.dataset.id
-          );
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "archive-client"
-        ) {
-          event.preventDefault();
-
-          await archiveClient(
-            element.dataset.id
-          );
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "edit-project"
-        ) {
-          event.preventDefault();
-
-          editProject(
-            element.dataset.id
-          );
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "archive-project"
-        ) {
-          event.preventDefault();
-
-          await archiveProject(
-            element.dataset.id
-          );
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "preview-project"
-        ) {
-          event.preventDefault();
-
-          previewProject(
-            element.dataset.id
-          );
-
-          return;
-        }
-
-
-        if (
-          action ===
-          "close-preview"
-        ) {
-          event.preventDefault();
-
-          show("projects");
-
-          return;
-        }
-      }
-    );
-
-
-    /* -----------------------------------------------------
-       FORM CLIENTE
-    ------------------------------------------------------ */
-
-    $("#clientForm")?.addEventListener(
-      "submit",
-      saveClient
-    );
-
-
-    $("#cancelClientBtn")?.addEventListener(
-      "click",
-      resetClientForm
-    );
-
-
-    /* -----------------------------------------------------
-       FORM PROJETO
-    ------------------------------------------------------ */
-
-    $("#projectForm")?.addEventListener(
-      "submit",
-      saveProject
-    );
-
-
-    $("#previewBtn")?.addEventListener(
-      "click",
-      previewCurrentProject
-    );
-
-
-    $("#downloadBtn")?.addEventListener(
-      "click",
-      downloadCurrentProject
-    );
-
-
-    /* -----------------------------------------------------
-       TEMPLATE SELECT
-    ------------------------------------------------------ */
-
-    $("#projectTemplate")?.addEventListener(
-      "change",
-      (event) => {
-        renderTemplateChoices(
-          event.target.value
-        );
-      }
-    );
-
-
-    /* -----------------------------------------------------
-       TEMPLATE CARDS
-    ------------------------------------------------------ */
-
-    $("#templateChoices")?.addEventListener(
-      "click",
-      (event) => {
-        const target =
-          event.target;
-
-        if (
-          !target ||
-          typeof target.closest !==
-            "function"
-        ) {
-          return;
-        }
-
-        const choice =
-          target.closest(
-            "[data-template-id]"
-          );
-
-        if (!choice) return;
-
-        const templateId =
-          choice.dataset.templateId;
-
-        const select =
-          $("#projectTemplate");
-
-        if (select) {
-          select.value =
-            templateId;
-        }
-
-        renderTemplateChoices(
-          templateId
-        );
-      }
-    );
-
-
-    /* -----------------------------------------------------
-       MENU MOBILE
-    ------------------------------------------------------ */
-
-    $("#mobileMenuBtn")?.addEventListener(
-      "click",
-      () => {
-        openMobileMenu();
-      }
-    );
-
-
-    /* -----------------------------------------------------
-       FECHAR MENU AO CLICAR FORA
-    ------------------------------------------------------ */
-
-    document.addEventListener(
-      "click",
-      (event) => {
-        const sidebar =
-          $(".sidebar");
-
-        const button =
-          $("#mobileMenuBtn");
-
-        if (!sidebar) return;
-
-        if (
-          window.innerWidth >
-          820
-        ) {
-          return;
-        }
-
-        if (
-          sidebar.contains(
-            event.target
-          ) ||
-          button?.contains(
-            event.target
-          )
-        ) {
-          return;
-        }
-
-        closeMobileMenu();
-      }
-    );
-  }
-
-
-  /* =======================================================
-     AUTH STATE
-  ======================================================== */
-
-  function bindAuthState() {
-    if (!supabaseClient) {
-      return;
-    }
-
-    supabaseClient.auth.onAuthStateChange(
-      async (
-        _event,
-        session
-      ) => {
-        try {
-          if (session?.user) {
-            state.user =
-              session.user;
-
-            if (
-              $("#app")?.classList.contains(
-                "hidden"
-              )
-            ) {
-              await enterApp();
-            }
-
-            return;
-          }
-
-          state.user =
-            null;
-
-          $("#app")?.classList.add(
-            "hidden"
-          );
-
-          $("#loginScreen")?.classList.remove(
-            "hidden"
-          );
-
-        } catch (error) {
-          console.error(
-            "Erro no estado de autenticação:",
-            error
-          );
-        }
-      }
-    );
-  }
-
-
-  /* =======================================================
-     INIT
-  ======================================================== */
-
-  async function init() {
-    if (state.initialized) {
-      return;
-    }
-
-    state.initialized =
-      true;
-
-    const supabaseReady =
-      initializeSupabase();
-
-    if (!supabaseReady) {
-      $("#loginScreen")?.classList.remove(
-        "hidden"
-      );
-
-      $("#app")?.classList.add(
-        "hidden"
-      );
-
-      showMessage(
-        $("#loginMessage"),
-        "Não foi possível inicializar o Supabase. Verifique se supabase.js está carregando corretamente.",
-        "error"
-      );
-
-      return;
-    }
-
-    bindEvents();
-
-    bindAuthState();
-
-    const session =
-      await getSession();
-
-    if (session?.user) {
-      state.user =
-        session.user;
-
-      await enterApp();
-
-      return;
-    }
-
-    $("#loginScreen")?.classList.remove(
-      "hidden"
-    );
-
-    $("#app")?.classList.add(
-      "hidden"
-    );
-  }
-
-
-  /* =======================================================
-     START
-  ======================================================== */
-
-  if (
-    document.readyState ===
-    "loading"
-  ) {
-    document.addEventListener(
-      "DOMContentLoaded",
-      init,
-      {
-        once: true
-      }
-    );
-  } else {
-    init();
-  }
-
-})();
