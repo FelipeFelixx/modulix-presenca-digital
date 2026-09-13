@@ -1,32 +1,969 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Modulix Studio</title><link rel="stylesheet" href="studio.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Modulix Studio</title>
+  <meta
+    name="description"
+    content="Modulix Studio — criação e gerenciamento de Presença Digital."
+  >
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="studio.css">
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Configuração pública do Supabase -->
+  <script src="supabase.js"></script>
 </head>
+
 <body>
-<header><a href="index.html"><b>Ｍ</b> MODULIX STUDIO</a><span>Presença Digital · V1</span></header>
-<main>
-<section class="hero"><div><small>✦ CENTRAL DE PRODUÇÃO</small><h1>Crie uma presença digital para cada cliente.</h1><p>Cadastre o negócio, escolha um modelo, preencha os dados e gere uma página personalizada sem editar código.</p></div><div class="status">● <strong>Studio operacional</strong><small>Dados salvos neste navegador</small></div></section>
-<nav><button data-tab="clients" class="active">Clientes <i id="count">0</i></button><button data-tab="new">+ Novo cliente</button><button data-tab="templates">Modelos</button><a href="index.html">← Página comercial</a></nav>
 
-<section id="clients" class="tab active"><div class="head"><div><small>CLIENTES</small><h2>Projetos cadastrados</h2></div><button id="newBtn">+ Novo cliente</button></div><div id="list"></div></section>
+  <!-- =========================================================
+       LOGIN
+  ========================================================== -->
 
-<section id="new" class="tab"><div class="head"><div><small>PROJETO</small><h2 id="formTitle">Cadastrar cliente</h2></div><button class="ghost" id="cancelBtn">Cancelar</button></div>
-<form id="form">
-<input type="hidden" id="id">
-<div class="card"><h3>Identidade</h3><div class="grid"><label>Empresa<input id="name" required placeholder="Café Central"></label><label>Categoria<input id="category" required placeholder="Cafeteria"></label><label>Slogan<input id="slogan" placeholder="Uma frase que representa o negócio"></label><label>Cor principal<input id="accent" type="color" value="#c8a45d"></label></div></div>
-<div class="card"><h3>Apresentação</h3><label>Descrição<textarea id="description" rows="4" placeholder="Conte sobre a empresa..."></textarea></label></div>
-<div class="card"><h3>Serviços e produtos</h3><label>Um item por linha<textarea id="services" rows="5" placeholder="Café especial&#10;Bolos artesanais&#10;Brunch"></textarea></label></div>
-<div class="card"><h3>Contato</h3><div class="grid"><label>WhatsApp<input id="whatsapp" placeholder="5535999999999"></label><label>Telefone<input id="phone"></label><label>E-mail<input id="email" type="email"></label><label>Instagram<input id="instagram" placeholder="https://instagram.com/suaempresa"></label><label>Endereço<input id="address"></label><label>Horário<input id="hours" placeholder="Seg–Sex · 08h às 18h"></label></div></div>
-<div class="card"><h3>Modelo</h3><div class="models"><label><input type="radio" name="template" value="premium" checked> <b>Premium</b><span>Escuro e sofisticado</span></label><label><input type="radio" name="template" value="clean"> <b>Clean</b><span>Claro e minimalista</span></label></div></div>
-<div class="actions"><button type="submit">Salvar cliente</button><button type="button" id="createProjectBtn">Criar projeto</button><button type="button" class="ghost" id="previewBtn">Visualizar</button></div>
-</form></section>
+  <section id="loginScreen" class="login-screen">
 
-<section id="templates" class="tab"><div class="head"><div><small>MODELOS</small><h2>Biblioteca inicial</h2></div></div><div class="templateGrid"><article><div class="sample premium">MODULIX<br><strong>SUA MARCA</strong></div><h3>Premium</h3><p>Escuro, elegante e orientado a conversão.</p></article><article><div class="sample clean"><strong>SUA MARCA</strong><br>Presença clara.</div><h3>Clean</h3><p>Claro, direto e minimalista.</p></article></div></section>
+    <div class="login-card">
 
-<section id="preview" class="preview"><div class="head"><div><small>PRÉ-VISUALIZAÇÃO</small><h2 id="previewName">Cliente</h2></div><div><button class="ghost" id="closePreview">Fechar</button> <button id="downloadBtn">Gerar página HTML</button></div></div><iframe id="frame" title="Pré-visualização"></iframe></section>
-</main><script src="studio.js"></script>
-</body></html>
+      <div class="brand-mark">
+        <span class="brand-icon">M</span>
+
+        <div>
+          <strong>MODULIX</strong>
+          <small>STUDIO</small>
+        </div>
+      </div>
+
+      <div class="login-heading">
+        <span class="eyebrow">MODULIX TECNOLOGIA</span>
+
+        <h1>
+          Presença Digital
+          <span>Studio</span>
+        </h1>
+
+        <p>
+          Crie, organize e gerencie a presença digital dos seus clientes
+          em um único ambiente.
+        </p>
+      </div>
+
+      <form id="loginForm" class="login-form">
+
+        <div class="field">
+
+          <label for="loginEmail">
+            E-mail
+          </label>
+
+          <input
+            id="loginEmail"
+            name="email"
+            type="email"
+            autocomplete="email"
+            placeholder="seu@email.com"
+            required
+          >
+
+        </div>
+
+        <div class="field">
+
+          <label for="loginPassword">
+            Senha
+          </label>
+
+          <input
+            id="loginPassword"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            required
+          >
+
+        </div>
+
+        <button
+          id="loginSubmit"
+          type="submit"
+          class="btn btn-primary btn-full"
+        >
+          Entrar no Studio
+        </button>
+
+        <p id="loginMessage" class="form-message"></p>
+
+      </form>
+
+      <div class="login-footer">
+        <span>Modulix Tecnologia</span>
+        <span>•</span>
+        <span>Ambiente interno</span>
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =========================================================
+       APLICAÇÃO
+  ========================================================== -->
+
+  <section id="app" class="app-shell hidden">
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+      <div class="sidebar-top">
+
+        <a href="#" class="studio-brand" data-view="dashboard">
+
+          <span class="brand-icon">M</span>
+
+          <div class="brand-text">
+            <strong>MODULIX</strong>
+            <small>STUDIO</small>
+          </div>
+
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <nav class="main-nav">
+
+          <button
+            type="button"
+            class="nav-item active"
+            data-view="dashboard"
+          >
+            <span class="nav-icon">⌂</span>
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            type="button"
+            class="nav-item"
+            data-view="clients"
+          >
+            <span class="nav-icon">♙</span>
+            <span>Clientes</span>
+          </button>
+
+          <button
+            type="button"
+            class="nav-item"
+            data-view="projects"
+          >
+            <span class="nav-icon">▣</span>
+            <span>Projetos</span>
+          </button>
+
+          <button
+            type="button"
+            class="nav-item"
+            data-view="templates"
+          >
+            <span class="nav-icon">◈</span>
+            <span>Modelos</span>
+          </button>
+
+        </nav>
+
+      </div>
+
+
+      <div class="sidebar-bottom">
+
+        <div class="sidebar-status">
+
+          <span class="status-dot"></span>
+
+          <div>
+            <strong>Studio online</strong>
+            <small>Supabase conectado</small>
+          </div>
+
+        </div>
+
+        <button
+          type="button"
+          id="logoutBtn"
+          class="logout-btn"
+        >
+          <span>↪</span>
+          Sair
+        </button>
+
+      </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+
+    <main class="main-content">
+
+      <!-- HEADER -->
+
+      <header class="topbar">
+
+        <div class="topbar-left">
+
+          <button
+            type="button"
+            id="mobileMenuBtn"
+            class="mobile-menu-btn"
+            aria-label="Abrir menu"
+          >
+            ☰
+          </button>
+
+          <div>
+
+            <span class="topbar-label">
+              MODULIX STUDIO
+            </span>
+
+            <h2 id="pageTitle">
+              Dashboard
+            </h2>
+
+          </div>
+
+        </div>
+
+
+        <div class="topbar-right">
+
+          <div class="user-info">
+
+            <span class="user-avatar">
+              M
+            </span>
+
+            <div>
+              <strong id="userEmail">
+                Usuário
+              </strong>
+
+              <small>
+                Operador
+              </small>
+            </div>
+
+          </div>
+
+        </div>
+
+      </header>
+
+
+      <!-- =====================================================
+           DASHBOARD
+      ====================================================== -->
+
+      <section
+        id="view-dashboard"
+        class="view active-view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              VISÃO GERAL
+            </span>
+
+            <h1>
+              Bem-vindo ao Studio.
+            </h1>
+
+            <p>
+              Centralize clientes, modelos e projetos de presença digital.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-view="clients"
+            data-action="new-client"
+          >
+            + Novo cliente
+          </button>
+
+        </div>
+
+
+        <!-- METRICS -->
+
+        <div class="metrics-grid">
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ♙
+            </div>
+
+            <div>
+              <span>Clientes</span>
+              <strong id="clientCount">0</strong>
+            </div>
+
+          </article>
+
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ▣
+            </div>
+
+            <div>
+              <span>Projetos</span>
+              <strong id="projectCount">0</strong>
+            </div>
+
+          </article>
+
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ◆
+            </div>
+
+            <div>
+              <span>Publicados</span>
+              <strong id="metricPublished">0</strong>
+            </div>
+
+          </article>
+
+
+          <article class="metric-card">
+
+            <div class="metric-icon">
+              ◈
+            </div>
+
+            <div>
+              <span>Modelos</span>
+              <strong id="templateCount">0</strong>
+            </div>
+
+          </article>
+
+        </div>
+
+
+        <!-- DASHBOARD CONTENT -->
+
+        <div class="dashboard-grid">
+
+          <article class="panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  CLIENTES
+                </span>
+
+                <h3>
+                  Clientes recentes
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                class="text-btn"
+                data-view="clients"
+              >
+                Ver todos →
+              </button>
+
+            </div>
+
+            <div
+              id="dashboardClients"
+              class="list-container"
+            >
+              <div class="empty-state">
+                <span>♙</span>
+                <strong>Nenhum cliente cadastrado</strong>
+                <p>Cadastre o primeiro cliente para começar.</p>
+              </div>
+            </div>
+
+          </article>
+
+
+          <article class="panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  PROJETOS
+                </span>
+
+                <h3>
+                  Projetos recentes
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                class="text-btn"
+                data-view="projects"
+              >
+                Ver todos →
+              </button>
+
+            </div>
+
+            <div
+              id="dashboardProjects"
+              class="list-container"
+            >
+              <div class="empty-state">
+                <span>▣</span>
+                <strong>Nenhum projeto criado</strong>
+                <p>Crie um projeto a partir de um cliente.</p>
+              </div>
+            </div>
+
+          </article>
+
+        </div>
+
+
+        <!-- QUICK START -->
+
+        <article class="quick-start">
+
+          <div class="quick-start-content">
+
+            <span class="eyebrow">
+              FLUXO MODULIX
+            </span>
+
+            <h2>
+              Da empresa à presença digital.
+            </h2>
+
+            <p>
+              Cadastre o cliente, escolha um modelo, preencha os dados
+              e gere uma página pronta para publicação.
+            </p>
+
+          </div>
+
+          <div class="quick-steps">
+
+            <div class="quick-step">
+              <span>01</span>
+              <strong>Cliente</strong>
+            </div>
+
+            <div class="quick-line"></div>
+
+            <div class="quick-step">
+              <span>02</span>
+              <strong>Modelo</strong>
+            </div>
+
+            <div class="quick-line"></div>
+
+            <div class="quick-step">
+              <span>03</span>
+              <strong>Conteúdo</strong>
+            </div>
+
+            <div class="quick-line"></div>
+
+            <div class="quick-step">
+              <span>04</span>
+              <strong>Presença</strong>
+            </div>
+
+          </div>
+
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           CLIENTES
+      ====================================================== -->
+
+      <section
+        id="view-clients"
+        class="view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              CRM
+            </span>
+
+            <h1>
+              Clientes
+            </h1>
+
+            <p>
+              Cadastre e organize as empresas atendidas pela Modulix.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-action="new-client"
+          >
+            + Novo cliente
+          </button>
+
+        </div>
+
+
+        <div class="content-grid">
+
+          <!-- FORM -->
+
+          <article class="panel form-panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  CADASTRO
+                </span>
+
+                <h3 id="clientFormTitle">
+                  Novo cliente
+                </h3>
+              </div>
+
+            </div>
+
+
+            <form id="clientForm">
+
+              <input
+                id="clientId"
+                type="hidden"
+              >
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>01</span>
+                  Informações principais
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientName">
+                    Nome / empresa *
+                  </label>
+
+                  <input
+                    id="clientName"
+                    type="text"
+                    placeholder="Ex.: Café Aurora"
+                    required
+                  >
+
+                </div>
+
+
+                <div class="form-row">
+
+                  <div class="field">
+
+                    <label for="clientCategory">
+                      Categoria
+                    </label>
+
+                    <input
+                      id="clientCategory"
+                      type="text"
+                      placeholder="Ex.: Restaurante"
+                    >
+
+                  </div>
+
+                  <div class="field">
+
+                    <label for="clientEmail">
+                      E-mail
+                    </label>
+
+                    <input
+                      id="clientEmail"
+                      type="email"
+                      placeholder="contato@empresa.com"
+                    >
+
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>02</span>
+                  Contato
+                </div>
+
+
+                <div class="form-row">
+
+                  <div class="field">
+
+                    <label for="clientPhone">
+                      Telefone
+                    </label>
+
+                    <input
+                      id="clientPhone"
+                      type="tel"
+                      placeholder="(35) 99999-9999"
+                    >
+
+                  </div>
+
+                  <div class="field">
+
+                    <label for="clientWhatsapp">
+                      WhatsApp
+                    </label>
+
+                    <input
+                      id="clientWhatsapp"
+                      type="tel"
+                      placeholder="(35) 99999-9999"
+                    >
+
+                  </div>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientInstagram">
+                    Instagram
+                  </label>
+
+                  <input
+                    id="clientInstagram"
+                    type="url"
+                    placeholder="https://instagram.com/empresa"
+                  >
+
+                </div>
+
+              </div>
+
+
+              <div class="form-section">
+
+                <div class="section-title">
+                  <span>03</span>
+                  Localização e operação
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientAddress">
+                    Endereço
+                  </label>
+
+                  <input
+                    id="clientAddress"
+                    type="text"
+                    placeholder="Rua, número, bairro, cidade"
+                  >
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientHours">
+                    Horário de funcionamento
+                  </label>
+
+                  <textarea
+                    id="clientHours"
+                    rows="3"
+                    placeholder="Segunda a sexta: 08h às 18h..."
+                  ></textarea>
+
+                </div>
+
+
+                <div class="field">
+
+                  <label for="clientNotes">
+                    Observações
+                  </label>
+
+                  <textarea
+                    id="clientNotes"
+                    rows="4"
+                    placeholder="Informações adicionais sobre o cliente..."
+                  ></textarea>
+
+                </div>
+
+              </div>
+
+
+              <div class="form-actions">
+
+                <button
+                  type="button"
+                  id="cancelClientBtn"
+                  class="btn btn-secondary"
+                >
+                  Limpar
+                </button>
+
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                >
+                  Salvar cliente
+                </button>
+
+              </div>
+
+              <p
+                id="clientMessage"
+                class="form-message"
+              ></p>
+
+            </form>
+
+          </article>
+
+
+          <!-- LIST -->
+
+          <article class="panel">
+
+            <div class="panel-header">
+
+              <div>
+                <span class="panel-kicker">
+                  BASE DE CLIENTES
+                </span>
+
+                <h3>
+                  Empresas
+                </h3>
+              </div>
+
+              <span
+                id="metricClients"
+                class="panel-counter"
+              >
+                0
+              </span>
+
+            </div>
+
+
+            <div
+              id="clientList"
+              class="list-container"
+            >
+              <div class="empty-state">
+                <span>♙</span>
+                <strong>Nenhum cliente cadastrado</strong>
+                <p>Use o formulário ao lado para adicionar um cliente.</p>
+              </div>
+            </div>
+
+          </article>
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================================
+           PROJETOS
+      ====================================================== -->
+
+      <section
+        id="view-projects"
+        class="view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              PRODUÇÃO
+            </span>
+
+            <h1>
+              Projetos
+            </h1>
+
+            <p>
+              Transforme os dados dos clientes em presenças digitais.
+            </p>
+
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-action="new-project"
+          >
+            + Novo projeto
+          </button>
+
+        </div>
+
+
+        <article class="panel">
+
+          <div class="panel-header">
+
+            <div>
+              <span class="panel-kicker">
+                PROJETOS DIGITAIS
+              </span>
+
+              <h3>
+                Todos os projetos
+              </h3>
+            </div>
+
+            <span
+              id="metricProjects"
+              class="panel-counter"
+            >
+              0
+            </span>
+
+          </div>
+
+
+          <div
+            id="projectList"
+            class="project-list"
+          >
+            <div class="empty-state">
+              <span>▣</span>
+              <strong>Nenhum projeto criado</strong>
+              <p>Crie um projeto para começar a gerar páginas.</p>
+            </div>
+          </div>
+
+        </article>
+
+      </section>
+
+
+      <!-- =====================================================
+           MODELOS
+      ====================================================== -->
+
+      <section
+        id="view-templates"
+        class="view"
+      >
+
+        <div class="page-intro">
+
+          <div>
+
+            <span class="eyebrow">
+              DESIGN SYSTEM
+            </span>
+
+            <h1>
+              Modelos
+            </h1>
+
+            <p>
+              Estruturas disponíveis para criação de presença digital.
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div
+          id="templateList"
+          class="templates-grid"
+        >
+
+          <div class="empty-state">
+            <span>◈</span>
+            <strong>Carregando modelos...</strong>
+            <p>Buscando modelos disponíveis.</p>
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================================
+           EDITOR DE PROJETO
+      ====================================================== -->
+
+      <section
+        id="view-editor"
+        class="view"
+      >
+
+        <div class="page-intro editor-heading">
+
+          <div>
+
+            <button
+              type="button"
+              class="back-btn"
+              data-view="projects"
+            >
+              ← Voltar para pro
